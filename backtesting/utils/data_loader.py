@@ -6,6 +6,9 @@ import time
 import config
 from datetime import datetime, timedelta, timezone
 
+from Strategies.universal.sanitize_symbol import sanitize_symbol
+
+
 def get_live_data(symbol, timeframe, candle_lookback):
     #print(f"[get_data] start_date: {start_date} ({type(start_date)})")
     #print(f"[get_data] end_date: {end_date} ({type(end_date)})")
@@ -42,6 +45,15 @@ def get_data(symbol, timeframe, start_date, end_date):
     if not mt5.initialize():
         raise RuntimeError(f"MT5 initialize failed: {mt5.last_error()}")
 
+    """symbols = mt5.symbols_get()
+    if symbols is None:
+        print("Brak danych o symbolach.")
+        return
+
+    print(f"Liczba symboli: {len(symbols)}")
+    for s in symbols:
+        print(s.name)"""
+
     if not mt5.symbol_select(symbol, True):
         mt5.symbol_select(symbol, False)  # Deselect
         time.sleep(0.5)
@@ -62,13 +74,14 @@ def load_data_from_csv():
     folder = "market_data"
 
     for symbol in config.SYMBOLS:
-        path = f"{folder}/{symbol}.csv"
+        safe_symbol = sanitize_symbol(symbol)
+        path = f"{folder}/{safe_symbol}.csv"
+
         if not os.path.exists(path):
             raise FileNotFoundError(f"Brak pliku CSV: {path}")
 
         df = pd.read_csv(path)
 
-        # Poprawna konwersja czasu (bez unit='s')
         if 'time' in df.columns:
             df['time'] = pd.to_datetime(df['time'], utc=True)
 

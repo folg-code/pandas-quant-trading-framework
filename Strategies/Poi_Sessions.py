@@ -127,7 +127,7 @@ class PoiSessions:
 
         self.price_action.run_full_detection()
 
-        print(self.price_action.df.columns)
+        #print(self.price_action.df.columns)
 
 
 
@@ -176,7 +176,7 @@ class PoiSessions:
         df = self.df.copy()
 
 
-        print(df.columns)
+        #print(df.columns)
 
 
         # --- 🔹 4. Inicjalizacja sygnałów ---

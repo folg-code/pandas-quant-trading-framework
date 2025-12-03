@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 import os
 import traceback
@@ -9,6 +10,7 @@ import MetaTrader5 as mt5
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import config
+from Strategies.universal.sanitize_symbol import sanitize_symbol
 from backtesting import plot
 from backtesting import raport
 from backtesting import backtest
@@ -16,30 +18,43 @@ from backtesting import backtest
 from backtesting.utils.data_loader import get_data, load_data_from_csv
 from backtesting.utils.strategy_loader import load_strategy
 
+
 def prepare_data_for_all_symbols(source="mt5"):
     """
-    source = "mt5"  -> pobiera z MetaTrader5 i zapisuje do CSV
-    source = "csv"  -> wczytuje dane z plików CSV
+    source = "mt5"  -> fetch from MetaTrader5 and save CSV
+    source = "csv"  -> load data from CSV files
     """
     os.makedirs("market_data", exist_ok=True)
 
     if source == "csv":
-        print("🔄 Ładowanie danych offline z CSV...")
+        print("🔄 Loading offline CSV market data...")
         return load_data_from_csv()
 
-    print("📡 Pobieranie danych z MT5...")
+    print("📡 Fetching market data from MT5...")
     data_dict = {}
 
     for symbol in config.SYMBOLS:
-        df = get_data(
-            symbol,
-            config.TIMEFRAME_MAP[config.TIMEFRAME],
-            datetime.strptime(config.TIMERANGE['start'], "%Y-%m-%d"),
-            datetime.strptime(config.TIMERANGE['end'], "%Y-%m-%d")
-        )
+
+        print(f"➡️  Processing symbol: {symbol}")
+
+        try:
+            df = get_data(
+                symbol,
+                config.TIMEFRAME_MAP[config.TIMEFRAME],
+                datetime.strptime(config.TIMERANGE['start'], "%Y-%m-%d"),
+                datetime.strptime(config.TIMERANGE['end'], "%Y-%m-%d")
+            )
+
+        except Exception as e:
+            print(f"❌ Error fetching {symbol}: {e}")
+            continue
 
         data_dict[symbol] = df
-        df.to_csv(f"market_data/{symbol}.csv")
+
+        safe_name = sanitize_symbol(symbol)
+        df.to_csv(f"market_data/{safe_name}.csv", index=False)
+
+        print(f"💾 Saved: market_data/{safe_name}.csv")
 
     return data_dict
 

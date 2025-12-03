@@ -10,21 +10,17 @@ MODE = "BACKTEST"
 strategy = "Poi_Sessions"
 
 # === Parametry rynku ===
-SYMBOLS =  [
-    #'XAUUSD',
-    #'GER40.cash', 'US500.cash',
-    #'GBPJPY', 'EURJPY',
-     #'EURGBP',
-    # 'EURCHF', 'USDPLN',
-    'GBPUSD',
-    #'EURUSD',
-    # 'AUDUSD', 'NZDUSD', 'USDCHF','USDCAD','USDJPY',
-    #'BTCUSD', 'ETHUSD'
+SYMBOLS = [
+    'GOLD',
+    'EUGERMANY40', 'US500', 'USTECH100',
+    'GBPJPY', 'EURJPY', 'EURGBP', 'EURCHF', 'USDPLN',
+    'GBPUSD', 'EURUSD', 'AUDUSD', 'NZDUSD', 'USDCHF','USDCAD','USDJPY',
+    'BTC/USD', 'ETH/USD'
 ]
 TIMEFRAME = 'M5'
 TIMERANGE = {
     'start': '2025-01-01',
-    'end': '2025-11-01'
+    'end': '2025-12-03'
 }
 # === Kapitał początkowy ===
 INITIAL_BALANCE = 10_000.0  # USD

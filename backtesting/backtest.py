@@ -4,7 +4,7 @@ import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 
-from Strategies.universal.position_sizer import position_sizer
+from Strategies.universal.position_sizer import position_sizer, get_pip_value
 
 
 def vectorized_backtest(
@@ -109,12 +109,12 @@ def _vectorized_backtest_single_symbol(
                 else entry_row['close'] * (1 - slippage)
             )
 
-
             position_size = position_sizer(
                 entry_price,
                 sl["level"],
                 max_risk = 0.005,
-                account_size= config.INITIAL_BALANCE)
+                account_size= config.INITIAL_BALANCE,
+                symbol=symbol)
             avg_entry_price = entry_price
             current_sl = sl["level"]
             exit_price = None
