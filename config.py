@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo  # Python 3.9+
 
 SERVER_TIMEZONE = ZoneInfo("UTC")
 
+MODE = "BACKTEST"
 # ====== Strategia =====
 strategy = "Poi_Sessions"
 
@@ -23,7 +24,7 @@ SYMBOLS =  [
 TIMEFRAME = 'M5'
 TIMERANGE = {
     'start': '2025-01-01',
-    'end': '2025-10-25'
+    'end': '2025-11-01'
 }
 # === Kapitał początkowy ===
 INITIAL_BALANCE = 10_000.0  # USD

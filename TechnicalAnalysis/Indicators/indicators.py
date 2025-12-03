@@ -606,7 +606,9 @@ def chopiness(bars, window=14):
 # =============================================
 
 
-def candlestick_confirmation(df, direction='bullish'):
+def candlestick_confirmation(df):
+    df = df.copy()
+
     open_ = df['open']
     close = df['close']
     high = df['high']
@@ -634,184 +636,129 @@ def candlestick_confirmation(df, direction='bullish'):
     df['min_5'] = df['low'].rolling(5).min()
     df['max_5'] = df['high'].rolling(5).max()
 
-    cisd_bull_cond = ((df['high'] < first_low))
-    cisd_bear_cond = ((df['low'] > first_high))
+    cisd_bull_cond = (df['high'] < first_low)
+    cisd_bear_cond = (df['low'] > first_high)
 
     df.loc[cisd_bull_cond, 'cisd_bull_line'] = first_low
     df.loc[cisd_bear_cond, 'cisd_bear_line'] = first_high
 
-    df[f'cisd_bull_line'] = df[f'cisd_bull_line'].ffill()
-    df[f'cisd_bear_line'] = df[f'cisd_bear_line'].ffill()
+    df['cisd_bull_line'] = df['cisd_bull_line'].ffill()
+    df['cisd_bear_line'] = df['cisd_bear_line'].ffill()
 
     mid_prev_body = (prev_open + prev_close) / 2
 
     is_bullish = close > open_
     is_bearish = close < open_
-
     atr = df['atr']
 
-    if direction == 'bullish':
-        hammer = (
-                (body < candle_range * 0.3) &
-                (lower_shadow > body * 1.5) &
-                (candle_range > atr * 1.5)
-        )
+    # -----------------------------
+    # 🔹 Bullish formacje
+    # -----------------------------
+    hammer_bull = (
+        (body < candle_range * 0.3) &
+        (lower_shadow > body * 1.5) &
+        (candle_range > atr * 1.5)
+    )
 
-        red_big_then_green = (
-                (prev_close < prev_open) &
-                (abs(prev_close - prev_open) > candle_range * 0.5) &
-                (close > open_)
-        )
+    engulf_three_bull = (
+        is_bullish &
+        (close > prev2_open) &
+        (open_ < prev_close)
+    )
 
-        big_green_with_wick = (
-                is_bullish &
-                (body > candle_range * 0.5) &
-                (candle_range > atr * 1.5)
-        )
+    prev1_body_high = prev_open.combine(prev_close, max)
+    prev2_body_high = prev2_open.combine(prev2_close, max)
+    close_above_prev_bodies = (close > prev1_body_high) & (close > prev2_body_high)
+    any_red = (prev2_close < prev2_open) | (prev3_close < prev3_open)
+    three_candle_breakout_bull = close_above_prev_bodies & any_red
 
-        close_under_then_above = (
-            (close > mid_prev_body)
-        )
+    ha_two_candle_bull = (
+        (close_ha > open_ha) &
+        (close_ha > open_ha.shift(1)) &
+        (close_ha.shift(1) < open_ha.shift(1))
+    )
 
-        doji = (abs(prev_close - prev_open) / (high - low)) < 0.1
-        doji_reversal = (
-            doji
-        )
+    ha_three_candle_bull = (
+        (low_ha.shift(1) > low_ha.shift(2)) &
+        (close_ha > open_ha) &
+        (close_ha.shift(1) < open_ha.shift(1)) &
+        (close_ha.shift(2) < open_ha.shift(2))
+    )
 
-        engulf_three = (
+    cisd_bull = (
+        (df['cisd_bull_line'] < close) & (df['cisd_bull_line'] > open_)
+    )
 
-                is_bullish &
-                (close > prev2_open) &
-                (open_ < prev_close)
-        )
 
-        prev1_body_high = prev_open.combine(prev_close, max)
-        prev2_body_high = prev2_open.combine(prev2_close, max)
+    # -----------------------------
+    # 🔹 Bearish formacje
+    # -----------------------------
+    hammer_bear = (
+        (body < candle_range * 0.3) &
+        (upper_shadow > body * 1.5) &
+        (candle_range > atr * 1.5)
+    )
 
-        close_above_prev_bodies = (close > prev1_body_high) & (close > prev2_body_high)
-        any_red = (prev2_close < prev2_open) | (prev3_close < prev3_open)
+    engulf_three_bear = (
+        is_bearish &
+        (close < prev2_open) &
+        (open_ > prev_close)
+    )
 
-        three_candle_breakout = (
-                close_above_prev_bodies & any_red
-        )
+    prev1_body_low = prev_open.combine(prev_close, min)
+    prev2_body_low = prev2_open.combine(prev2_close, min)
+    close_below_prev_bodies = (close < prev1_body_low) & (close < prev2_body_low)
+    any_green = (prev2_close > prev2_open) | (prev3_close > prev3_open)
+    three_candle_breakout_bear = close_below_prev_bodies & any_green
 
-        ha_two_candle = (
-                (close_ha > open_ha) &
-                (close_ha > open_ha.shift(1)) &
-                (close_ha.shift(1) < open_ha.shift(1)))
+    ha_two_candle_bear = (
+        (close_ha < open_ha) &
+        (close_ha < open_ha.shift(1)) &
+        (close_ha.shift(1) > open_ha.shift(1))
+    )
 
-        ha_three_candle = (
-                (low_ha.shift(1) > low_ha.shift(2)) &
-                (close_ha > open_ha) &
-                (close_ha.shift(1) < open_ha.shift(1)) &
-                (close_ha.shift(2) < open_ha.shift(2))
-        )
+    ha_three_candle_bear = (
+        (high_ha.shift(1) < high_ha.shift(2)) &
+        (close_ha < open_ha) &
+        (close_ha.shift(1) > open_ha.shift(1)) &
+        (close_ha.shift(2) > open_ha.shift(2))
+    )
 
-        cisd_bull = (
-                (df['cisd_bull_line'] < close) & (df['cisd_bull_line'] > open_))
+    cisd_bear = (
+        (df['cisd_bear_line'] > close) & (df['cisd_bear_line'] < open_)
+    )
 
-        df['candle_form'] = ""
+    condition_map_bear = {
+        "hammer_bear": hammer_bear,
+        "cisd_bear": cisd_bear,
+        "three_candle_bear": three_candle_breakout_bear,
+        "ha_three_candle_bear": ha_three_candle_bear,
+        "ha_two_candle_bear": ha_two_candle_bear,
+        "engulf_three_bear": engulf_three_bear,
+    }
 
-        condition_map = {
-            "hammer": hammer,
-            "cisd_bull": cisd_bull,
-            "three_candle_breakout": three_candle_breakout,
-            "ha_three_candle": ha_three_candle,
-            "ha_two_candle": ha_two_candle,
+    condition_map_bull = {
+        "hammer_bull": hammer_bull,
+        "cisd_bull": cisd_bull,
+        "three_candle_bull": three_candle_breakout_bull,
+        "ha_three_candle_bull": ha_three_candle_bull,
+        "ha_two_candle_bull": ha_two_candle_bull,
+        "engulf_three_bull": engulf_three_bull,
+    }
 
-        }
+    df['candle_bullish'] = None
+    df['candle_bearish'] = None
 
-        final_condition = pd.Series(False, index=df.index)
+    for name, cond in condition_map_bear.items():
+        df.loc[cond & df['candle_bearish'].isna(), 'candle_bearish'] = name
 
-        for name, cond in condition_map.items():
-            # Przypisz nazwę tylko tam, gdzie jeszcze pusto
-            df.loc[cond & (df['candle_form'] == ""), 'candle_form'] = name
-            # Buduj warunek końcowy
-            final_condition |= cond
+    for name, cond in condition_map_bull.items():
+        df.loc[cond & df['candle_bullish'].isna(), 'candle_bullish'] = name
 
-        return final_condition
-
-    elif direction == 'bearish':
-        hammer = (
-                (body < candle_range * 0.3) &
-                (upper_shadow > body * 1.5) &
-                (candle_range > atr * 1.5)
-        )
-
-        green_big_then_red = (
-                (prev_close > prev_open) &
-                (abs(prev_close - prev_open) > candle_range * 0.5) &
-                (close < open_)
-        )
-
-        big_red_with_wick = (
-                is_bearish &
-                (body > candle_range * 0.5) &
-                (candle_range > atr * 1.5)
-        )
-
-        close_above_then_below = (
-            (close < mid_prev_body)
-        )
-
-        doji = (abs(prev_close - prev_open) / (high - low)) < 0.1
-        doji_reversal = (doji)
-
-        engulf_three = (
-                is_bearish &
-                (close < prev2_open) &
-                (open_ > prev_close)
-        )
-
-        prev1_body_low = prev_open.combine(prev_close, min)
-        prev2_body_low = prev2_open.combine(prev2_close, min)
-
-        close_below_prev_bodies = (close < prev1_body_low) & (close < prev2_body_low)
-        any_green = (prev2_close > prev2_open) | (prev3_close > prev3_open)
-
-        three_candle_breakout = (
-                close_below_prev_bodies & any_green
-        )
-
-        ha_two_candle = (
-                (close_ha < open_ha) &
-                (close_ha < open_ha.shift(1)) &
-                (close_ha.shift(1) > open_ha.shift(1))
-
-        )
-
-        ha_three_candle = (
-                (high_ha.shift(1) < high_ha.shift(2)) &
-                (close_ha < open_ha) &
-                (close_ha.shift(1) > open_ha.shift(1)) &
-                (close_ha.shift(2) > open_ha.shift(2))
-        )
-
-        cisd_bear = (
-                (df['cisd_bear_line'] > close) & (df['cisd_bear_line'] < open_))
-
-        df['candle_form'] = ""
-
-        condition_map = {
-            "cisd_bear": cisd_bear,  # 0.0214, win rate 53.2%, profit 70%, DD 1750$, daily 485$
-            # "hammer": hammer,
-            "three_candle_breakout": three_candle_breakout,  # 0.0269, win rate 54.6%, profit 160%, DD 1366$, daily 555$
-            # "ha_three_candle": ha_three_candle,
-            # "ha_two_candle" : ha_two_candle,
-            # "engulf_three": engulf_three,
-            # Dodaj inne warunki jeśli chcesz
-        }
-
-        final_condition = pd.Series(False, index=df.index)
-
-        for name, cond in condition_map.items():
-            df.loc[cond & (df['candle_form'] == ""), 'candle_form'] = name
-            final_condition |= cond
-
-        return final_condition
-
-    else:
-        raise ValueError("direction must be 'bullish' or 'bearish'")
+    # -----------------------------
+    # 🔹 Zwracamy tylko 2 kolumny
+    # -----------------------------
+    return df[['candle_bullish', 'candle_bearish']]
 ############################################################################
 
 def rma(dataframe, source, period):

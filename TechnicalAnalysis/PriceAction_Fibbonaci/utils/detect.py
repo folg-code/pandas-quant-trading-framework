@@ -98,13 +98,25 @@ def detect_fibo(
 
     # ------------------- Lokalne HH/LL -------------------
     df2[f'last_low_{pivot_range}'] = (
-        np.where(LL_idx > HL_idx, LL, HL))
+        np.where(
+            LL_idx > HL_idx,
+            LL,HL)
+    )
     df2[f'last_low_{pivot_range}_idx'] = (
-        np.where(LL_idx > HL_idx, LL_idx, HL_idx))
+        np.where(
+            LL_idx > HL_idx,
+            LL_idx, HL_idx)
+    )
     df2[f'last_high_{pivot_range}'] = (
-        np.where(HH_idx > LH_idx, HH, LH))
+        np.where(
+            HH_idx > LH_idx,
+            HH, LH)
+    )
     df2[f'last_high_{pivot_range}_idx'] = (
-        np.where(HH_idx > LH_idx, HH_idx, LH_idx))
+        np.where(
+            HH_idx > LH_idx,
+            HH_idx, LH_idx)
+    )
 
     # Aktualizacja wybicia
     df2['real_last_high'] = (

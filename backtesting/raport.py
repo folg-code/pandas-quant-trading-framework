@@ -1,3 +1,7 @@
+import contextlib
+import os
+from io import StringIO
+
 import config
 import numpy as np
 from datetime import timedelta
@@ -7,6 +11,8 @@ from rich.table import Table
 
 def compute_equity(trades_df, starting_capital=config.INITIAL_BALANCE):
     trades = trades_df.copy()
+
+    print(trades_df['position_size'])
 
     trades['pnl_points'] = trades['pnl']
 
@@ -403,9 +409,26 @@ def print_backtest_report(trades_df, processed_df):
 
         print_group_stats(tp1_trades, "entry_tag", "ENTER TAG STATS for trades that HIT TP1")
         print_group_stats(tp1_trades, "exit_tag", "EXIT STATS for trades that HIT TP1")
-    #print_weekday_profitability(trades_df)
-    #print_hourly_profitability(trades_df, time_col="entry_time")
-    #print_hourly_profitability(trades_df, time_col="exit_time")
     print_final_raport(trades_df, "symbol",
                        f"BACKTESTING REPORT {processed_df['time'].min()} to {processed_df['time'].max()}")
     print_summary_metrics(trades_df, initial_balance=trades_df['capital'].iloc[0])
+
+
+def save_backtest_report(trades_df, processed_df, filename="results/my_backtest_report.txt"):
+    """
+    Generuje pełny raport i zapisuje go do pliku tekstowego.
+    Tworzy folder, jeśli nie istnieje.
+    """
+    # Utwórz folder, jeśli nie istnieje
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+    # Przechwycenie wszystkiego co drukuje rich.Console
+    buffer = StringIO()
+    with contextlib.redirect_stdout(buffer):
+        print_backtest_report(trades_df, processed_df)
+
+    # Zapis do pliku
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(buffer.getvalue())
+
+    print(f"✅ Raport zapisany do pliku: {filename}")

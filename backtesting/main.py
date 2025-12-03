@@ -13,19 +13,34 @@ from backtesting import plot
 from backtesting import raport
 from backtesting import backtest
 
-from backtesting.utils.data_loader import get_data
+from backtesting.utils.data_loader import get_data, load_data_from_csv
 from backtesting.utils.strategy_loader import load_strategy
 
-def prepare_data_for_all_symbols():
+def prepare_data_for_all_symbols(source="mt5"):
+    """
+    source = "mt5"  -> pobiera z MetaTrader5 i zapisuje do CSV
+    source = "csv"  -> wczytuje dane z plików CSV
+    """
     os.makedirs("market_data", exist_ok=True)
-    data_dict = {}
-    for symbol in config.SYMBOLS:
-        df = get_data(symbol, config.TIMEFRAME_MAP[config.TIMEFRAME],
-                      datetime.strptime(config.TIMERANGE['start'], "%Y-%m-%d"),
-                      datetime.strptime(config.TIMERANGE['end'], "%Y-%m-%d"))
-        data_dict[symbol] = df
 
-        df.to_csv(f"market_data/{symbol}.csv", index=True)
+    if source == "csv":
+        print("🔄 Ładowanie danych offline z CSV...")
+        return load_data_from_csv()
+
+    print("📡 Pobieranie danych z MT5...")
+    data_dict = {}
+
+    for symbol in config.SYMBOLS:
+        df = get_data(
+            symbol,
+            config.TIMEFRAME_MAP[config.TIMEFRAME],
+            datetime.strptime(config.TIMERANGE['start'], "%Y-%m-%d"),
+            datetime.strptime(config.TIMERANGE['end'], "%Y-%m-%d")
+        )
+
+        data_dict[symbol] = df
+        df.to_csv(f"market_data/{symbol}.csv")
+
     return data_dict
 
 
@@ -39,26 +54,38 @@ def run_strategy_single(symbol_df_tuple):
     return df_bt, strategy
 
 
-# Inicjalizacja
-if not mt5.initialize():
-    print("MT5 init error:", mt5.last_error())
-    quit()
+OFFLINE = True   # 🔄 przełącz offline/online
+
+
+if not OFFLINE:
+    # Inicjalizacja MT5 tylko w trybie online
+    if not mt5.initialize():
+        print("MT5 init error:", mt5.last_error())
+        quit()
+
 
 if __name__ == "__main__":
+
+
+
     start_time = datetime.now()
     print(f"⏱ Start programu: {start_time}")
 
-    print("✅ Pobieranie danych z MT5...")
+    print("📂 Ładowanie danych..." if OFFLINE else "📡 Pobieranie danych z MT5...")
     data_start = datetime.now()
-    all_data = prepare_data_for_all_symbols()
-    tick = mt5.symbol_info_tick("EURUSD")
 
+    # ONLINE -> z MT5  |  OFFLINE -> z CSV
+    all_data = prepare_data_for_all_symbols("csv" if OFFLINE else "mt5")
+
+    if not OFFLINE:
+        tick = mt5.symbol_info_tick("EURUSD")
 
     local_time = datetime.now()
     print("Lokalny czas:", local_time)
     print(f"⏱ Czas pobierania danych: {local_time - data_start}")
 
-    mt5.shutdown()  # Zamyka MT5, żeby uniknąć problemów przy multiprocessing
+    if not OFFLINE:
+        mt5.shutdown()  # Zamykamy MT5 tylko gdy było używane
 
     print("✅ Uruchamianie strategii równolegle...")
     strategies_start = datetime.now()
@@ -101,9 +128,9 @@ if __name__ == "__main__":
     if not trades_all.empty:
         trades_all = raport.compute_equity(trades_all)
         plot.plot_equity(trades_all)
-        raport.print_backtest_report(trades_all, df_all_signals)
+        raport.save_backtest_report(trades_all, df_all_signals, "results/my_backtest_report.txt")
 
-        plots_folder = "trades_plots/plots"
+        plots_folder = "results/plots"
         os.makedirs(plots_folder, exist_ok=True)
 
         for strategy in all_strategies:
@@ -123,8 +150,9 @@ if __name__ == "__main__":
                 )
 
         if config.SAVE_TRADES_CSV:
-            output_folder = "trades_plots/trades"
+            output_folder = "results/trades"
             os.makedirs(output_folder, exist_ok=True)
             trades_all.to_csv(os.path.join(output_folder, "trades_ALL.csv"), index=False)
-
+    else:
+        print("brak trade")
     print("🏁 Zakończono.")

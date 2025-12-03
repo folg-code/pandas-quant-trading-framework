@@ -4,6 +4,8 @@ import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 
+from Strategies.universal.position_sizer import position_sizer
+
 
 def vectorized_backtest(
         df: pd.DataFrame,
@@ -17,8 +19,14 @@ def vectorized_backtest(
 ) -> pd.DataFrame:
 
     if symbol is not None:
-        return _vectorized_backtest_single_symbol(df, symbol, slippage, sl_pct, tp_pct, initial_size, max_size,
-                                                  SINGLE_POSIOTION_MODE)
+        return _vectorized_backtest_single_symbol(
+            df,
+            symbol,
+            slippage,
+            sl_pct, tp_pct,
+            initial_size, max_size,
+            SINGLE_POSIOTION_MODE
+        )
 
     all_trades = []
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
@@ -52,14 +60,16 @@ def _vectorized_backtest_single_symbol(
         max_size: float,
         SINGLE_POSIOTION_MODE: bool
 ) -> pd.DataFrame:
+
     df = df.copy().reset_index(drop=False)
     trades = []
     blocked_tags = set()
-
     print("🚀 Init: _vectorized_backtest_single_symbol")
 
+    active_tags = set()
 
     for direction in ['long', 'short']:
+
         entries_pos = df.index[
             df['signal_entry'].apply(lambda x: isinstance(x, dict) and x.get('direction') == direction)
         ].tolist()
@@ -68,11 +78,12 @@ def _vectorized_backtest_single_symbol(
             df['signal_exit'].apply(lambda x: isinstance(x, dict) and x.get('direction') == direction)
         ].tolist()
 
-
+        executed_trades = []
 
         for entry_pos in entries_pos:
             entry_row = df.loc[entry_pos]
             entry_signal = entry_row['signal_entry']
+            entry_tag = entry_signal.get("tag") if isinstance(entry_signal, dict) else str(entry_signal)
             entry_time = entry_row['time']
             levels = entry_row.get('levels', None)
 
@@ -83,6 +94,14 @@ def _vectorized_backtest_single_symbol(
 
 
 
+            if any(t['enter_tag'] == entry_tag and t['exit_time'] > entry_time for t in executed_trades):
+                continue
+
+            min_time_gap = pd.Timedelta(minutes=30)
+
+            #if any(abs(entry_time - t['entry_time']) < min_time_gap for t in trades if t['direction'] == direction):
+            # continue
+
             # --- Kierunek & cena wejścia ---
             entry_price = (
                 entry_row['close'] * (1 + slippage)
@@ -90,8 +109,12 @@ def _vectorized_backtest_single_symbol(
                 else entry_row['close'] * (1 - slippage)
             )
 
-            entry_tag = entry_signal.get("tag") if isinstance(entry_signal, dict) else str(entry_signal)
-            position_size = initial_size
+
+            position_size = position_sizer(
+                entry_price,
+                sl["level"],
+                max_risk = 0.005,
+                account_size= config.INITIAL_BALANCE)
             avg_entry_price = entry_price
             current_sl = sl["level"]
             exit_price = None
@@ -208,6 +231,8 @@ def _vectorized_backtest_single_symbol(
             elif pnl_total > 0 and blocked_tags:
                 blocked_tags.clear()
 
+            active_tags.discard(entry_signal.get("tag"))
+
             trades.append({
                 'symbol': symbol,
                 'direction': direction,
@@ -215,7 +240,7 @@ def _vectorized_backtest_single_symbol(
                 'exit_time': exit_time,
                 'entry_price': avg_entry_price,
                 'exit_price': exit_price,
-                'position_size': initial_size,
+                'position_size': position_size,
                 'pnl': pnl_total,
                 'exit_reason': exit_reason,
                 'entry_tag': entry_tag,
@@ -226,6 +251,11 @@ def _vectorized_backtest_single_symbol(
                 'tp2_price': tp2 if exit_reason == tp2['tag'] else None,
                 'tp2_time': exit_time if exit_reason == tp2['tag'] else None,
                 'tp1_pnl': tp1_pnl
+            })
+
+            executed_trades.append({
+                'enter_tag': entry_tag,
+                'exit_time': exit_time
             })
 
     print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")

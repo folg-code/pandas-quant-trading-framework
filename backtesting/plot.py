@@ -54,11 +54,11 @@ def add_zone(fig, row, df, label, fillcolor, font_color):
         opacity=0.8
     )
 
-def add_trade_marker(fig, x, y, tag, pnl, pnl_usd, price, marker_type, color, symbol, showlegend=False, exit_reason=None):
+def add_trade_marker(fig, x, y, tag, position_size, pnl_usd, price, marker_type, color, symbol, showlegend=False, exit_reason=None):
     hovertext = (
         f"Enter Tag: {tag.get('entry_tag', '')}<br>" +
         f"Exit Tag: {tag.get('exit_tag', '')}<br>" +
-        f"PnL: {pnl:.5f} <br>" +
+        f"position_size: {position_size:.5f} <br>" +
         f"Profit: {pnl_usd:.5f} <br>" +
         f"Price: {price:.5f}<br>" +
         (f"Exit Reason: {exit_reason}<br>" if exit_reason else "") +
@@ -99,7 +99,7 @@ def plot_trades_with_indicators(df, trades, bullish_zones=None, bearish_zones=No
             x=trade['entry_time'],
             y=trade['entry_price'],
             tag=trade,
-            pnl=trade['pnl'],
+            position_size=trade['position_size'],
             pnl_usd=trade['pnl_usd'],
             price=trade['entry_price'],
             marker_type='Entry',
@@ -132,7 +132,7 @@ def plot_trades_with_indicators(df, trades, bullish_zones=None, bearish_zones=No
                 x=trade['tp1_time'],
                 y=trade['tp1_price'],
                 tag=trade,
-                pnl=trade['pnl'],
+                position_size=trade['position_size'],
                 pnl_usd=trade['tp1_pnl'],
                 price=trade['tp1_price'],
                 marker_type='TP1',
@@ -165,7 +165,7 @@ def plot_trades_with_indicators(df, trades, bullish_zones=None, bearish_zones=No
             x=trade['exit_time'],
             y=trade['exit_price'],
             tag=trade,
-            pnl=trade['pnl'],
+            position_size=trade['position_size'],
             pnl_usd=trade['pnl_usd'],
             price=trade['exit_price'],
             marker_type=legend_key,
@@ -263,13 +263,13 @@ def plot_trades_with_indicators(df, trades, bullish_zones=None, bearish_zones=No
             # Ustal wartość Y na podstawie rodzaju pivotu
             y_value = None
             if pivot_val == 3:
-                y_value = row.get('HH_15')
+                y_value = row.get('HH_50')
             elif pivot_val == 4:
-                y_value = row.get('LL_15')
+                y_value = row.get('LL_50')
             elif pivot_val == 5:
-                y_value = row.get('LH_15')
+                y_value = row.get('LH_50')
             elif pivot_val == 6:
-                y_value = row.get('HL_15')
+                y_value = row.get('HL_50')
 
             if pd.isna(y_value):
                 continue

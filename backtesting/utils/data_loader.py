@@ -1,3 +1,5 @@
+import os
+
 import MetaTrader5 as mt5
 import pandas as pd
 import time
@@ -54,3 +56,28 @@ def get_data(symbol, timeframe, start_date, end_date):
     df['time'] = pd.to_datetime(df['time'], unit='s', utc=True)
     df['time'] = df['time'].dt.tz_convert(config.SERVER_TIMEZONE)
     return df
+
+def load_data_from_csv():
+    data_dict = {}
+    folder = "market_data"
+
+    for symbol in config.SYMBOLS:
+        path = f"{folder}/{symbol}.csv"
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Brak pliku CSV: {path}")
+
+        df = pd.read_csv(path)
+
+        # Poprawna konwersja czasu (bez unit='s')
+        if 'time' in df.columns:
+            df['time'] = pd.to_datetime(df['time'], utc=True)
+
+        # Jeśli index-based
+        if df.columns[0] not in ['time']:
+            df['index'] = pd.to_datetime(df.iloc[:, 0], utc=True)
+            df.set_index('index', inplace=True)
+            df.drop(columns=[df.columns[0]], inplace=True)
+
+        data_dict[symbol] = df
+
+    return data_dict

@@ -39,36 +39,68 @@ class SmartMoneyConcepts:
             df_["tf"] = tf
 
         # Scalanie stref
-        bullish_zones = pd.concat([bullish_fvg, bullish_ob], ignore_index=True).sort_values(by='idx')
-        bearish_zones = pd.concat([bearish_fvg, bearish_ob], ignore_index=True).sort_values(by='idx')
+        bullish_zones = pd.concat(
+            [bullish_fvg, bullish_ob],
+            ignore_index=True
+        ).sort_values(by='idx')
+        bearish_zones = pd.concat(
+            [bearish_fvg, bearish_ob],
+            ignore_index=True
+        ).sort_values(by='idx')
 
         # Walidacja stref
-        bullish_zones_validated, bearish_zones_validated = invalidate_zones_by_candle_extremes_multi(
-            tf, self.df, bullish_zones, bearish_zones
+        bullish_zones_validated, bearish_zones_validated = (
+            invalidate_zones_by_candle_extremes_multi(
+                tf,
+                self.df,
+                bullish_zones,
+                bearish_zones
+            )
         )
-
-
 
         # Dynamiczne atrybuty z sufiksem _{tf} tylko jeśli tf != "M5"
         tf_suffix = f"_{tf}" if tf and tf != "M5" else ""
 
-        setattr(self, f"bullish_fvg_validated{tf_suffix}",
-                bullish_zones_validated[bullish_zones_validated['zone_type'] == 'fvg'].copy())
-        setattr(self, f"bullish_ob_validated{tf_suffix}",
-                bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ob'].copy())
-        setattr(self, f"bullish_breaker_validated{tf_suffix}",
-                bullish_zones_validated[bullish_zones_validated['zone_type'] == 'breaker'].copy())
-        setattr(self, f"bullish_ifvg_validated{tf_suffix}",
-                bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ifvg'].copy())
-
-        setattr(self, f"bearish_fvg_validated{tf_suffix}",
-                bearish_zones_validated[bearish_zones_validated['zone_type'] == 'fvg'].copy())
-        setattr(self, f"bearish_ob_validated{tf_suffix}",
-                bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ob'].copy())
-        setattr(self, f"bearish_breaker_validated{tf_suffix}",
-                bearish_zones_validated[bearish_zones_validated['zone_type'] == 'breaker'].copy())
-        setattr(self, f"bearish_ifvg_validated{tf_suffix}",
-                bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ifvg'].copy())
+        setattr(
+            self,
+            f"bullish_fvg_validated{tf_suffix}",
+            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'fvg'].copy()
+        )
+        setattr(
+            self,
+            f"bullish_ob_validated{tf_suffix}",
+            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ob'].copy()
+        )
+        setattr(
+            self,
+            f"bullish_breaker_validated{tf_suffix}",
+            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'breaker'].copy()
+        )
+        setattr(
+            self,
+            f"bullish_ifvg_validated{tf_suffix}",
+            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ifvg'].copy()
+        )
+        setattr(
+            self,
+            f"bearish_fvg_validated{tf_suffix}",
+            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'fvg'].copy()
+        )
+        setattr(
+            self,
+            f"bearish_ob_validated{tf_suffix}",
+            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ob'].copy()
+        )
+        setattr(
+            self,
+            f"bearish_breaker_validated{tf_suffix}",
+            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'breaker'].copy()
+        )
+        setattr(
+            self,
+            f"bearish_ifvg_validated{tf_suffix}",
+            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ifvg'].copy()
+        )
 
 
 

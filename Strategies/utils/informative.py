@@ -1,6 +1,6 @@
 import pandas as pd
 import config
-from backtesting.utils.data_loader import get_live_data
+from backtesting.utils.data_loader import get_live_data, load_data_from_csv
 import MetaTrader5 as mt5
 from Strategies.utils.decorators import informative
 
@@ -24,17 +24,25 @@ def get_informative_dataframe(symbol, timeframe: str, startup_candle_count: int)
     start_time = pd.to_datetime(config.TIMERANGE['start']).tz_localize(config.SERVER_TIMEZONE) - pd.to_timedelta(extra_minutes, unit='m')
     end_time = pd.to_datetime(config.TIMERANGE['end']).tz_localize(config.SERVER_TIMEZONE)
 
-    #print(f"[get_informative_dataframe] start_time: {start_time} ({start_time.tzinfo})")
-    #print(f"[get_informative_dataframe] end_time: {end_time} ({end_time.tzinfo})")
+    offline_data = load_data_from_csv()
+    # ----------------------------
+    # BACKTEST MODE
+    # ----------------------------
+    if config.MODE == "BACKTEST":
+        df_all = offline_data[symbol]
 
-    df = get_live_data(
+        # tu masz dane z CSV — tylko trzeba je przyciąć
+        mask = (df_all['time'] >= start_time) & (df_all['time'] <= end_time)
+        return df_all.loc[mask].copy()
+
+    # ----------------------------
+    # LIVE MODE
+    # ----------------------------
+    return get_live_data(
         symbol,
         getattr(mt5, f"TIMEFRAME_{timeframe}"),
         6000
     )
-
-
-    return df
 
 
 def merge_informative_data(df: pd.DataFrame, timeframe: str, informative_df: pd.DataFrame) -> pd.DataFrame:

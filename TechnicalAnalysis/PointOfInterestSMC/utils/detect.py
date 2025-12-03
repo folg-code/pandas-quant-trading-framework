@@ -23,27 +23,26 @@ def detect_ob(df2, pivot_range=3, min_candles=3, atr_multiplier=3.0):
     body_to_range = real_body / candle_range
 
     is_doji = body_to_range < 0.1
-    is_pinbar = ((high_shift - close_shift) > (candle_range * 0.6)) | ((close_shift - low_shift) > (candle_range * 0.6))
-
+    is_pinbar = (
+            ((high_shift - close_shift) > (candle_range * 0.6)
+            )
+            |((close_shift - low_shift) > (candle_range * 0.6)
+            )
+    )
     previous_red = (df2['close'].shift(2) < df2['open'].shift(2))
     high_confirmation = (
-            (df2['high'].rolling(3).max().shift(shift_idx + 1) <= df2['high'].shift(shift_idx))
-            | (df2[['open', 'close']].max(axis=1).rolling(3).max().shift(shift_idx + 1) <= df2[['open', 'close']].max(
-        axis=1).shift(shift_idx))
+            (df2['high'].rolling(3).max().shift(shift_idx + 1) <=
+             df2['high'].shift(shift_idx)
+             )
+            |(df2[['open', 'close']].max(axis=1).rolling(3).max().shift(shift_idx + 1) <=
+              df2[['open', 'close']].max(axis=1).shift(shift_idx)
+            )
     )
     bear_opposite = close_shift > open_shift
     bear_valid_shape = (
             bear_opposite
-            | (
-                    is_doji
-                    & previous_red
-                    & high_confirmation
-            )
-            | (
-                    is_pinbar
-                    & previous_red
-                    & high_confirmation
-            )
+            | (is_doji & previous_red & high_confirmation )
+            | (is_pinbar & previous_red & high_confirmation)
     )
 
     bear_structure_break = df2["low"].shift(pivot_range) < low_shift
@@ -58,25 +57,19 @@ def detect_ob(df2, pivot_range=3, min_candles=3, atr_multiplier=3.0):
             bear_range_expansion
     )
     low_confirmation = (
-            (df2['low'].rolling(3).min().shift(shift_idx + 1) >= df2['low'].shift(shift_idx))
-            | (df2[['open', 'close']].min(axis=1).rolling(3).min().shift(shift_idx + 1) >= df2[['open', 'close']].min(
-        axis=1).shift(shift_idx))
+            (df2['low'].rolling(3).min().shift(shift_idx + 1) >=
+             df2['low'].shift(shift_idx)
+            )
+            | (df2[['open', 'close']].min(axis=1).rolling(3).min().shift(shift_idx + 1) >=
+               df2[['open', 'close']].min(axis=1).shift(shift_idx)
+              )
     )
     previous_red = (df2['close'].shift(2) < df2['open'].shift(2))
     bull_opposite = close_shift < open_shift
     bull_valid_shape = (
             bull_opposite
-            |
-            (
-                    is_doji
-                    & previous_red
-                    & low_confirmation
-            )
-            | (
-                    is_pinbar
-                    & previous_red
-                    & low_confirmation
-            )
+            |(is_doji & previous_red & low_confirmation)
+            | (is_pinbar & previous_red & low_confirmation)
     )
 
     bull_structure_break = df2["high"] > high_shift
@@ -95,8 +88,12 @@ def detect_ob(df2, pivot_range=3, min_candles=3, atr_multiplier=3.0):
     # FILTR ANTY-DUPLIKATOWY (max 1 OB co 5 świec)
     # ---------------------
     lookback = 5
-    bear_cond &= ~(bear_cond.rolling(window=lookback, min_periods=1).max().shift(1).fillna(False).astype(bool))
-    bull_cond &= ~(bull_cond.rolling(window=lookback, min_periods=1).max().shift(1).fillna(False).astype(bool))
+    bear_cond &= ~(bear_cond
+                   .rolling(window=lookback, min_periods=1)
+                   .max().shift(1).fillna(False).astype(bool))
+    bull_cond &= ~(bull_cond
+                   .rolling(window=lookback, min_periods=1)
+                   .max().shift(1).fillna(False).astype(bool))
 
     # ---------------------
     # ZAPISANIE WYNIKÓW
@@ -135,9 +132,11 @@ def detect_fvg(df, body_multiplier=1.3):
     # Bullish condition
     no_gap_bull = df2['open'] <= df2['high'].shift(1)
     fvg_bull_cond = (
-            (df2['low'] > df2['first_high']) &
-            ((df2['low'] - df2['first_high']) > df2['avg_body_size'] * body_multiplier) &
-            no_gap_bull  # <- gap filter
+            (df2['low'] > df2['first_high'])
+            &((df2['low'] - df2['first_high']) >
+             df2['avg_body_size'] * body_multiplier
+             )
+            & no_gap_bull  # <- gap filter
     )
     bullish_fvg = df2.loc[fvg_bull_cond, ['first_high', 'low', 'idx', 'time']]
 
@@ -145,15 +144,32 @@ def detect_fvg(df, body_multiplier=1.3):
     no_gap_bear = df2['open'] >= df2['low'].shift(1)
     fvg_bear_cond = (
             (df2['high'] < df2['first_low'])
-            & ((df2['first_low'] - df2['high']) > df2['avg_body_size'] * body_multiplier)
+            & ((df2['first_low'] - df2['high']) >
+               df2['avg_body_size'] * body_multiplier
+               )
             & no_gap_bear  # <- gap filter
     )
-    bearish_fvg = df2.loc[fvg_bear_cond, ['first_low', 'high', 'idx', 'time']]
-    bullish_fvg_renamed = bullish_fvg.rename(columns={'first_high': 'low_boundary', 'low': 'high_boundary'})
-    bearish_fvg_renamed = bearish_fvg.rename(columns={'first_low': 'high_boundary', 'high': 'low_boundary'})
+    bearish_fvg = df2.loc[
+        fvg_bear_cond,
+        ['first_low', 'high', 'idx', 'time']
+    ]
+    bullish_fvg_renamed = (bullish_fvg
+                           .rename(columns={'first_high': 'low_boundary',
+                                            'low': 'high_boundary'}
+                                   )
+                           )
+    bearish_fvg_renamed = (
+        bearish_fvg.rename(columns={'first_low': 'high_boundary',
+                                    'high': 'low_boundary'}
+                           )
+    )
 
-    df2.drop(columns=['middle_open', 'middle_close', 'middle_body', 'avg_body_size'],
-             inplace=True)
+    df2.drop(columns=[
+        'middle_open',
+        'middle_close',
+        'middle_body',
+        'avg_body_size'
+    ], inplace=True)
 
     return bullish_fvg_renamed, bearish_fvg_renamed
 
@@ -164,23 +180,33 @@ def detect_gaps(df, gap_threshold=0.002):
     df2['curr_open'] = df2['open']
 
     # Oblicz względną zmianę
-    df2['gap_change'] = (df2['curr_open'] - df2['prev_close']) / df2['prev_close']
+    df2['gap_change'] = (
+            (df2['curr_open'] - df2['prev_close']) / df2['prev_close'])
 
     # Gap up
     gap_up_cond = df2['gap_change'] > gap_threshold
-    gap_up = df2.loc[gap_up_cond, ['prev_close', 'curr_open', 'idx', 'time']]
-    gap_up_renamed = gap_up.rename(columns={
+    gap_up = df2.loc[
+        gap_up_cond,
+        ['prev_close', 'curr_open', 'idx', 'time']
+    ]
+    gap_up_renamed = (gap_up
+    .rename(columns={
         'prev_close': 'low_boundary',
-        'curr_open': 'high_boundary'
-    })
+        'curr_open': 'high_boundary'}
+    )
+    )
 
     # Gap down
     gap_down_cond = df2['gap_change'] < -gap_threshold
-    gap_down = df2.loc[gap_down_cond, ['curr_open', 'prev_close', 'idx', 'time']]
-    gap_down_renamed = gap_down.rename(columns={
+    gap_down = df2.loc[
+        gap_down_cond,
+        ['curr_open', 'prev_close', 'idx', 'time']
+    ]
+    gap_down_renamed = (gap_down
+    .rename(columns={
         'curr_open': 'low_boundary',
-        'prev_close': 'high_boundary'
-    })
+        'prev_close': 'high_boundary'}
+    ))
 
     df2.drop(columns=['prev_close', 'curr_open', 'gap_change'], inplace=True)
 

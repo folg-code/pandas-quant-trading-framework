@@ -31,7 +31,9 @@ def mark_zone_reactions(df: pd.DataFrame, all_zones: pd.DataFrame, time_col: str
     lows = df['low'].values
     highs = df['high'].values
     zone_starts = all_zones['time'].values.astype('datetime64[ns]')
-    zone_ends = all_zones['validate_till_time'].fillna(pd.Timestamp.max).values.astype('datetime64[ns]')
+    zone_ends = (
+        all_zones['validate_till_time'].fillna(pd.Timestamp.max).values.astype('datetime64[ns]')
+    )
     zone_lows = all_zones['low_boundary'].values
     zone_highs = all_zones['high_boundary'].values
     directions = all_zones['direction'].values
@@ -172,27 +174,77 @@ def vector_check_reaction_optimized(
 
     if direction == 'bullish':
         # Hammer
-        hammer = (body < candle_range*0.3) & ((close - low) > body*1.5) & (close > level_array) & (low < level_array) & (candle_range > atr*1.5)
+        hammer = (
+                (body < candle_range*0.3)
+                & ((close - low) > body*1.5)
+                & (close > level_array)
+                & (low < level_array)
+                & (candle_range > atr*1.5)
+        )
         # Big green with wick
-        big_green_with_wick = is_bullish & (body > candle_range*0.5) & (low < level_array) & (close > level_array) & (candle_range > atr*1.5)
+        big_green_with_wick = (
+                is_bullish
+                & (body > candle_range*0.5)
+                & (low < level_array)
+                & (close > level_array)
+                & (candle_range > atr*1.5)
+        )
         # Close under then above
-        close_under_then_above = (prev_close < level_array) & (close > level_array) & (close > mid_prev_body)
+        close_under_then_above = (
+                (prev_close < level_array)
+                & (close > level_array)
+                & (close > mid_prev_body)
+        )
         # CISD bullish
-        cisd_bull = (cisd_bull_line < close) & (cisd_bull_line > open_) & (level_array < close) & (min_5 < level_array)
+        cisd_bull = (
+                (cisd_bull_line < close)
+                & (cisd_bull_line > open_)
+                & (level_array < close)
+                & (min_5 < level_array)
+        )
         # Combine all
-        reaction = hammer | big_green_with_wick | close_under_then_above | cisd_bull
+        reaction = (
+                hammer
+                | big_green_with_wick
+                | close_under_then_above
+                | cisd_bull
+        )
 
     elif direction == 'bearish':
         # Hammer
-        hammer = (body < candle_range*0.3) & ((high - close) > body*1.5) & (close < level_array) & (high > level_array)
+        hammer = (
+                (body < candle_range*0.3)
+                & ((high - close) > body*1.5)
+                & (close < level_array)
+                & (high > level_array)
+        )
         # Big red with wick
-        big_red_with_wick = is_bearish & (body > candle_range*0.5) & (high > level_array) & (close < level_array)
+        big_red_with_wick = (
+                is_bearish
+                & (body > candle_range*0.5)
+                & (high > level_array)
+                & (close < level_array)
+        )
         # Close above then below
-        close_above_then_below = (prev_close > level_array) & (close < level_array) & (close < mid_prev_body)
+        close_above_then_below = (
+                (prev_close > level_array)
+                & (close < level_array)
+                & (close < mid_prev_body)
+        )
         # CISD bearish
-        cisd_bear = (cisd_bear_line > close) & (cisd_bear_line < open_) & (level_array > close) & (max_5 > level_array)
+        cisd_bear = (
+                (cisd_bear_line > close)
+                & (cisd_bear_line < open_)
+                & (level_array > close)
+                & (max_5 > level_array)
+        )
         # Combine all
-        reaction = hammer | big_red_with_wick | close_above_then_below | cisd_bear
+        reaction = (
+                hammer
+                | big_red_with_wick
+                | close_above_then_below
+                | cisd_bear
+        )
 
     else:
         raise ValueError("direction must be 'bullish' or 'bearish'")
