@@ -1,7 +1,7 @@
 import pandas as pd
 
 REQUIRED_COLUMNS = [
-    "time", "open", "high", "low", "close"
+    "time", "open", "high", "low", "close", "spread"
 ]
 
 
