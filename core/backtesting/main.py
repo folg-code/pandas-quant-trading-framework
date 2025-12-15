@@ -5,23 +5,23 @@ import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import config
+from core.backtesting.backtest import Backtester
 from core.backtesting.raport import BacktestReporter
 from core.data.data_provider import DataProvider
 from core.strategy.strategy_factory import create_strategy
 
 from core.backtesting import plot, backtest
-from core.backtesting import raport
 
 
 def run_strategy_single(symbol_df_tuple):
     symbol, df = symbol_df_tuple
-
     provider = DataProvider(mode="backtest")
     strategy = create_strategy(symbol, df, config, provider)
     df_bt = strategy.run()
     df_bt["symbol"] = symbol
 
     return df_bt, strategy
+
 
 
 if __name__ == "__main__":
@@ -103,14 +103,10 @@ if __name__ == "__main__":
     print("✅ Uruchamianie backtestu...")
     backtest_start = datetime.now()
 
-    trades_all = backtest.vectorized_backtest(
-        df_all_signals,
-        None,
-        config.SLIPPAGE,
-        config.INITIAL_SIZE,
-        config.MAX_SIZE,
+    backtester = Backtester(
+        slippage=config.SLIPPAGE,
     )
-
+    trades_all = backtester.run_backtest(df=df_all_signals)
 
     print(f"⏱ Czas backtestu: {datetime.now() - backtest_start}")
 
@@ -118,7 +114,7 @@ if __name__ == "__main__":
         print("⚠️ Brak transakcji.")
         exit(0)
 
-
+    print(trades_all)
     print(trades_all.columns)
     # === REPORTING ===
     reporter = BacktestReporter(trades_all, df_all_signals, initial_balance=config.INITIAL_BALANCE)
