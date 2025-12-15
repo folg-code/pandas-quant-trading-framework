@@ -5,6 +5,7 @@ import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import config
+from core.backtesting.raport import BacktestReporter
 from core.data.data_provider import DataProvider
 from core.strategy.strategy_factory import create_strategy
 
@@ -110,21 +111,18 @@ if __name__ == "__main__":
         config.MAX_SIZE,
     )
 
+
     print(f"⏱ Czas backtestu: {datetime.now() - backtest_start}")
 
-    # === REPORTING ===
     if trades_all.empty:
         print("⚠️ Brak transakcji.")
         exit(0)
 
-    trades_all = raport.compute_equity(trades_all)
-    plot.plot_equity(trades_all)
 
-    raport.save_backtest_report(
-        trades_all,
-        df_all_signals,
-        "results/my_backtest_report.txt",
-    )
+    print(trades_all.columns)
+    # === REPORTING ===
+    reporter = BacktestReporter(trades_all, df_all_signals, initial_balance=config.INITIAL_BALANCE)
+    reporter.run()
 
     plots_folder = "results/plots"
     os.makedirs(plots_folder, exist_ok=True)

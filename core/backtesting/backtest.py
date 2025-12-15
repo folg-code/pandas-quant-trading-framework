@@ -4,7 +4,7 @@ import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 
-from Strategies.universal.position_sizer import position_sizer, get_pip_value
+from Strategies.universal.position_sizer import position_sizer, get_pip_value, get_point_size
 
 
 def vectorized_backtest(
@@ -106,6 +106,7 @@ def _vectorized_backtest_single_symbol(
                 max_risk = 0.005,
                 account_size= config.INITIAL_BALANCE,
                 symbol=symbol)
+
             avg_entry_price = entry_price
             current_sl = sl["level"]
             exit_price = None
@@ -116,6 +117,7 @@ def _vectorized_backtest_single_symbol(
             tp1_executed = False
             tp1_exit_reason = None
             pnl_total = 0
+            pnl_usd = 0
 
             tp1_pnl = None
 
@@ -200,6 +202,8 @@ def _vectorized_backtest_single_symbol(
                         exit_time = time
                         break
 
+
+
             if exit_price is None:
                 exit_price = df.iloc[-1]['close'] * (1 - slippage) if direction == 'long' else df.iloc[-1]['close'] * (
                             1 + slippage)
@@ -217,12 +221,20 @@ def _vectorized_backtest_single_symbol(
                 else:
                     pnl_total = (avg_entry_price - exit_price)
 
+
             if pnl_total < 0:
                 blocked_tags.add(entry_signal['tag'])
             elif pnl_total > 0 and blocked_tags:
                 blocked_tags.clear()
 
+
             active_tags.discard(entry_signal.get("tag"))
+
+            pip_value = get_pip_value(symbol)
+            point_size = get_point_size(symbol)
+
+            # PnL w USD
+            pnl_usd = pnl_total * (position_size / entry_price) * (pip_value / point_size)
 
             trades.append({
                 'symbol': symbol,
@@ -233,6 +245,7 @@ def _vectorized_backtest_single_symbol(
                 'exit_price': exit_price,
                 'position_size': position_size,
                 'pnl': pnl_total,
+                'pnl_usd': pnl_usd,
                 'exit_reason': exit_reason,
                 'entry_tag': entry_tag,
                 'exit_tag': exit_reason,
@@ -250,5 +263,6 @@ def _vectorized_backtest_single_symbol(
             })
 
     print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
+
 
     return pd.DataFrame(trades)
