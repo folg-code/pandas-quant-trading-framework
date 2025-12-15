@@ -1,43 +1,71 @@
+import os
+import json
+import MetaTrader5 as mt5
 
-def position_sizer(close, sl, max_risk, account_size, pip_value_per_lot=10, risk_is_percent=True):
+CACHE_FILE = "market_data/pip_values.json"
+
+def load_pip_cache():
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_pip_cache(cache):
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+    with open(CACHE_FILE, "w") as f:
+        json.dump(cache, f, indent=2)
+
+def get_pip_value(symbol: str, lot_size=1.0, default_pip=10):
     """
-    Oblicza wielkość pozycji (loty), aby ryzyko na trade nie przekraczało max_risk.
-
-    Parameters
-    ----------
-    close : float
-        Cena wejścia w pozycję.
-    sl : float
-        Poziom stop loss.
-    max_risk : float
-        Maksymalne ryzyko — procent (np. 0.01 = 1%) lub wartość nominalna (np. 100).
-    account_size : float
-        Wartość kapitału.
-    pip_value_per_lot : float, default=10
-        Wartość 1 pipsa dla 1 lota.
-    risk_is_percent : bool, default=True
-        Czy max_risk jest w procentach (True) czy w kwocie (False).
-
-    Returns
-    -------
-    float
-        Wielkość pozycji w lotach.
+    Pobiera wartość pip dla symbolu. Korzysta z cache lub MT5.
     """
-    # różnica w pipsach między wejściem a SL
+    cache = load_pip_cache()
+    if symbol in cache:
+        return cache[symbol]
 
-    if isinstance(close, dict) or isinstance(sl, dict):
-        print("❗Błąd: close albo sl jest dict:")
-        print("close =", close)
-        print("sl =", sl)
+    pip_value = default_pip
+    if mt5.initialize():
+        info = mt5.symbol_info(symbol)
+        if info is not None:
+            pip_value = info.trade_tick_value * lot_size
+        mt5.shutdown()
 
-    pip_distance = abs(close - sl) * 10000  # dla par typu EURUSD
+    cache[symbol] = pip_value
+    save_pip_cache(cache)
+    return pip_value
 
-    if pip_distance == 0:
+def get_point_size(symbol: str, default_point=0.0001):
+    """
+    Pobiera minimalny ruch ceny (point) dla symbolu.
+    """
+    if mt5.initialize():
+        info = mt5.symbol_info(symbol)
+        if info is not None:
+            point = info.point
+            mt5.shutdown()
+            return point
+    return default_point
+
+def position_sizer(close, sl, max_risk, account_size, symbol,
+                   lot_size=1.0, risk_is_percent=True, default_pip=10, default_point=None):
+    """
+    Oblicza wielkość pozycji w lotach dla dowolnego instrumentu.
+    """
+    if close == sl:
         return 0
 
-    # oblicz kwotę ryzyka
+    # Pip distance w jednostkach instrumentu
+    point_size = default_point or get_point_size(symbol)
+    pip_distance = abs(close - sl) / point_size
+
+    # Wartość pip dla 1 lota
+    pip_value_per_lot = get_pip_value(symbol, lot_size=lot_size, default_pip=default_pip)
+
+    # Kwota ryzyka
     risk_amount = max_risk * account_size if risk_is_percent else max_risk
 
-    # oblicz wielkość pozycji
-    lot_size = risk_amount / (pip_distance * pip_value_per_lot)
-    return round(lot_size, 3)
+    # Obliczenie wielkości pozycji
+    lot_calc = risk_amount / (pip_distance * pip_value_per_lot)
+    return round(lot_calc, 3)
+
+

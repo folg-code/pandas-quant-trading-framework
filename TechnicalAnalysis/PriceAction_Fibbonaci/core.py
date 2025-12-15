@@ -165,7 +165,6 @@ class PriceStructureDetector:
             df[f'LH_{pivot_range}_idx'], df[f'HL_{pivot_range}_idx']
         )
 
-        print(df.dtypes)
 
         # Lokalne poziomy
         df[f'last_low_{pivot_range}'] = np.where(LL_idx > HL_idx, LL, HL)

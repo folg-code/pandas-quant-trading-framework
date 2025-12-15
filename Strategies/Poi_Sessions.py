@@ -3,49 +3,44 @@ import time
 import numpy as np
 import pandas as pd
 import talib.abstract as ta
+
+from Strategies.BaseStrategy import BaseStrategy
+from Strategies.Mixins import InformativeStrategyMixin
 from TechnicalAnalysis.Indicators import indicators as qtpylib
 from Strategies.utils.decorators import informative
 from Strategies.utils.df_trimmer import trim_all_dataframes
-from Strategies.utils.informative import populate_informative_indicators
 from TechnicalAnalysis.Indicators.indicators import candlestick_confirmation
 from TechnicalAnalysis.PointOfInterestSMC.core import SmartMoneyConcepts
 from TechnicalAnalysis.PriceAction_Fibbonaci.core import PriceStructureDetector
 from TechnicalAnalysis.SessionsSMC.core import SessionsSMC
 
 
-class PoiSessions:
-    def __init__(self, df: pd.DataFrame, symbol, startup_candle_count: int = 600):
-        self.startup_candle_count = startup_candle_count
-        self.df = df.copy()
-        self.symbol = symbol
-        self.informative_dataframes = {}
-        # Inicjalizacja klasy SmartMoneyConcepts
+class PoiSessions(BaseStrategy):
+
+    def __init__(self, df, symbol, startup_candle_count, provider):
+        super().__init__(df, symbol, startup_candle_count,provider)
         self.smc = SmartMoneyConcepts(self.df)
         self.sessions = SessionsSMC(self.df)
-        self.price_action = PriceStructureDetector(self.df, 50)
+        self.price_action = PriceStructureDetector(self.df)
         self.sessions_h1 = None
 
     @informative('H1')
     def populate_indicators_H1(self, df: pd.DataFrame):
 
-        df['idx'] = df.index
         df['atr'] = ta.ATR(df, 14)
+        df['idx'] = df.index
 
-
-        # Aktualizujemy niezależne instancje
         self.smc.df = df.copy()
         self.smc.find_validate_zones(tf="H1")
 
         self.sessions_h1 = SessionsSMC(df.copy())
         self.sessions_h1.df = self.sessions_h1.calculate_previous_ranges()
 
-        # Zwracamy coś, by merge mógł zadziałać
         return df
 
     def populate_indicators(self):
-        self.df = self.df.rename(columns={'time_x': 'time'})
-        if 'time_y' in self.df.columns:
-            self.df = self.df.drop(columns=['time_y'])
+
+
 
         self.df['idx'] = self.df.index
         self.df['atr'] = ta.ATR(self.df, 14)
@@ -87,6 +82,8 @@ class PoiSessions:
         self.smc.find_validate_zones(tf="M5")
         self.smc.detect_reaction()
 
+
+
         def merge_flags(prefix):
             return self.smc.df[f"{prefix}_reaction_H1"] | self.smc.df[f"{prefix}_in_zone_H1"], \
                    self.smc.df[f"{prefix}_reaction"] | self.smc.df[f"{prefix}_in_zone"]
@@ -127,42 +124,11 @@ class PoiSessions:
 
         self.price_action.run_full_detection()
 
-        print(self.price_action.df.columns)
 
 
 
-    def merge_external_dfs(self):
-        """
-        Łączy dane z:
-        - self.smc.df (kolumny: htf/ltf active)
-        - self.sessions.df (kolumny: sygnały i kontekst)
-        - self.price_action.df (kolumny: price_action_context, price_action_signal)
-        """
 
-        base = self.df.copy()
 
-        # --- 1️⃣ self.smc.df ---
-        if hasattr(self, "smc") and hasattr(self.smc, "df"):
-            smc_cols = ['htf_long_active', 'ltf_long_active', 'htf_short_active', 'ltf_short_active']
-            smc_df = self.smc.df[['time'] + [c for c in smc_cols if c in self.smc.df.columns]]
-            base = base.merge(smc_df, on='time', how='left', validate='1:1')
-
-        # --- 2️⃣ self.sessions.df ---
-        if hasattr(self, "sessions") and hasattr(self.sessions, "df"):
-            sessions_cols = ['sessions_signal', 'session_context', 'signal_strength',
-                             'prev_day_direction', 'session_bias']
-            sessions_df = self.sessions.df[['time'] + [c for c in sessions_cols if c in self.sessions.df.columns]]
-            base = base.merge(sessions_df, on='time', how='left', validate='1:1')
-
-        # --- 3️⃣ self.price_action.df ---
-        if hasattr(self, "price_action") and hasattr(self.price_action, "df"):
-            pa_cols = ['price_action_context', 'price_action_signal',
-                       'sr_context', 'sr_signal',
-                       'pa_fake_break_context', 'pa_fake_break_signal']
-            pa_df = self.price_action.df[['time'] + [c for c in pa_cols if c in self.price_action.df.columns]]
-            base = base.merge(pa_df, on='time', how='left', validate='1:1')
-
-        self.df = base
 
     def populate_entry_trend(self):
         """
@@ -173,10 +139,11 @@ class PoiSessions:
         - strefy HTF/LTF (OB, FVG, Breaker)
         """
 
+        self.merge_external_dfs()
+
         df = self.df.copy()
 
 
-        print(df.columns)
 
 
         # --- 🔹 4. Inicjalizacja sygnałów ---
@@ -272,23 +239,23 @@ class PoiSessions:
 
     def get_extra_values_to_plot(self):
         return [
-            #("london_high", self.sessions.df["london_high"], "blue", "dot"),
-            #("london_low", self.sessions.df["london_low"], "blue", "dot"),
-            #("asia_high", self.sessions.df["asia_high"], "purple", "dot"),
-            #("asia_low", self.sessions.df["asia_low"], "purple", "dot"),
-            #("ny_high", self.sessions.df["ny_high"], "orange", "dash"),
-            #("ny_low", self.sessions.df["ny_low"], "orange", "dash"),
+            ("london_high", self.sessions.df["london_high"], "blue", "dot"),
+            ("london_low", self.sessions.df["london_low"], "blue", "dot"),
+            ("asia_high", self.sessions.df["asia_high"], "purple", "dot"),
+            ("asia_low", self.sessions.df["asia_low"], "purple", "dot"),
+            ("ny_high", self.sessions.df["ny_high"], "orange", "dash"),
+            ("ny_low", self.sessions.df["ny_low"], "orange", "dash"),
 
             #("mss_bear_10", self.price_action.df['mss_bear_10'], "pink"),
             #("bos_bear_10", self.price_action.df['bos_bear_10'], "red"),
             #("mss_bull_10", self.price_action.df['mss_bull_10'], "yellow"),
             #("bos_bull_10", self.price_action.df['bos_bull_10'], "orange"),
 
-            ("PDH", self.sessions.df["PDH"], "blue"),
-            ("PDL", self.sessions.df["PDL"], "blue"),
+            #("PDH", self.sessions.df["PDH"], "blue"),
+            #("PDL", self.sessions.df["PDL"], "blue"),
 
-            ("PWH", self.sessions.df["PWH"], "yellow"),
-            ("PWL", self.sessions.df["PWL"], "yellow"),
+            #("PWH", self.sessions.df["PWH"], "yellow"),
+            #("PWL", self.sessions.df["PWL"], "yellow"),
         ]
 
     def get_bullish_zones(self):
@@ -324,37 +291,6 @@ class PoiSessions:
              #("Bearish FVG H1", self.smc.bearish_fvg_validated_H1, "rgba(173, 216, 230, 0.7)"),  # Jasnoszary
         ]
 
-    def run(self) -> pd.DataFrame:
-
-        timings = []  # Lista do przechowywania czasów
-
-        def timeit(label, func):
-            start = time.time()
-            func()
-            end = time.time()
-            duration = end - start
-            timings.append((label, duration))
-
-
-        timeit("_populate_informative_indicators", lambda: populate_informative_indicators(self))
-        timeit("self.populate_indicators()", lambda: self.populate_indicators())
-        timeit("self.merge_external_dfs()", lambda: self.merge_external_dfs())
-        timeit("self.populate_entry_trend()", lambda: self.populate_entry_trend())
-        timeit("self.populate_exit_trend()", lambda: self.populate_exit_trend())
-        timeit("trim_all_dataframes(self)", lambda: trim_all_dataframes(self))
-
-        print("\nSummary:")
-        for label, duration in timings:
-            print(f"{label:<35} {duration:.4f} sec")
-
-        self.df_plot = self.df.copy()
-
-
-        # Przygotuj okrojoną wersję do backtestu
-        self.df_backtest = self.df[
-            ['time', 'open', 'high', 'low', 'close', 'atr', 'signal_entry', 'signal_exit', 'levels']].copy()
-
-        return self.df_backtest
 
     def calculate_levels(self, signals, close,  sl_long, sl_short):
 
@@ -363,9 +299,6 @@ class PoiSessions:
 
         direction = signals.get("direction")
         tag = signals.get("tag")
-
-
-
 
         if direction == "long":
             sl = sl_long
@@ -381,3 +314,38 @@ class PoiSessions:
             "TP1": {"level": tp1, "tag": "RR_1:2"},
             "TP2": {"level": tp2, "tag": "RR_1:4"},
         }
+
+    def merge_external_dfs(self):
+        """
+        Łączy dane z:
+        - self.smc.df (kolumny: htf/ltf active)
+        - self.sessions.df (kolumny: sygnały i kontekst)
+        - self.price_action.df (kolumny: price_action_context, price_action_signal)
+        """
+
+        base = self.df.copy()
+
+
+
+        # --- 1️⃣ self.smc.df ---
+        if hasattr(self, "smc") and hasattr(self.smc, "df"):
+            smc_cols = ['htf_long_active', 'ltf_long_active', 'htf_short_active', 'ltf_short_active']
+            smc_df = self.smc.df[['time'] + [c for c in smc_cols if c in self.smc.df.columns]]
+            base = base.merge(smc_df, on='time', how='left', validate='1:1')
+
+        # --- 2️⃣ self.sessions.df ---
+        if hasattr(self, "sessions") and hasattr(self.sessions, "df"):
+            sessions_cols = ['sessions_signal', 'session_context', 'signal_strength',
+                             'prev_day_direction', 'session_bias']
+            sessions_df = self.sessions.df[['time'] + [c for c in sessions_cols if c in self.sessions.df.columns]]
+            base = base.merge(sessions_df, on='time', how='left', validate='1:1')
+
+        # --- 3️⃣ self.price_action.df ---
+        if hasattr(self, "price_action") and hasattr(self.price_action, "df"):
+            pa_cols = ['price_action_context', 'price_action_signal',
+                       'sr_context', 'sr_signal',
+                       'pa_fake_break_context', 'pa_fake_break_signal']
+            pa_df = self.price_action.df[['time'] + [c for c in pa_cols if c in self.price_action.df.columns]]
+            base = base.merge(pa_df, on='time', how='left', validate='1:1')
+
+        self.df = base
