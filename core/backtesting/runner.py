@@ -1,17 +1,13 @@
 import os
-import traceback
-from datetime import datetime
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import config
 from core.backtesting.backtester import Backtester
-from core.backtesting.plot import TradePlotter
+from core.backtesting.plotting.plot import TradePlotter
 from core.backtesting.raporter import BacktestReporter
 from core.data.data_provider import DataProvider
 from core.strategy.strategy_factory import create_strategy
-
-from core.backtesting import plot, backtester
 
 
 def run_strategy_single(symbol_df_tuple):
@@ -84,6 +80,7 @@ class BacktestRunner:
         backtester = Backtester(slippage=self.config.SLIPPAGE)
         self.trades_df = backtester.run_backtest(self.signals_df)
 
+
         if self.trades_df.empty:
             raise RuntimeError("Brak transakcji")
 
@@ -139,7 +136,7 @@ class BacktestRunner:
         self.run_strategies_parallel(all_data)
         self.run_backtest()
         self.run_report()
-        self.plot_results()
+        #self.plot_results()
         self.save_trades()
 
         print("🏁 Backtest finished")

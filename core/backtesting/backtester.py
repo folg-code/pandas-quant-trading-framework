@@ -4,9 +4,23 @@ import pandas as pd
 import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
+import MetaTrader5 as mt5
 
-from core.utils.position_sizer import position_sizer
+from core.backtesting.simulate_exit_numba import simulate_exit_numba
+from core.utils.position_sizer import position_sizer, position_sizer_fast
 from core.backtesting.trade import Trade
+
+INSTRUMENT_META = {
+    "EURUSD": {
+        "point": 0.0001,
+        "pip_value": 10.0,
+    },
+    "XAUUSD": {
+        "point": 0.01,
+        "pip_value": 1.0,
+    },
+}
+
 
 
 class Backtester:
@@ -27,113 +41,103 @@ class Backtester:
 
         return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
 
-    def _backtest_single_symbol(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-        trades: List[dict] = []
-        blocked_tags = set()
-        active_tags = set()
+    def _backtest_single_symbol(self, df, symbol):
+        trades = []
 
-        for direction in ['long', 'short']:
-            entries_pos = df.index[df['signal_entry'].apply(
-                lambda x: isinstance(x, dict) and x.get('direction') == direction
-            )].tolist()
+        df = df.copy()
+        df["time"] = df["time"].dt.tz_localize(None)
 
-            executed_trades = []
+        high_arr = df["high"].values
+        low_arr = df["low"].values
+        close_arr = df["close"].values
+        time_arr = df["time"].values
 
-            for entry_pos in entries_pos:
-                row = df.loc[entry_pos]
-                entry_signal = row['signal_entry']
-                entry_tag = entry_signal.get("tag") if isinstance(entry_signal, dict) else str(entry_signal)
-                entry_time = row['time']
-                levels = row.get('levels', {})
+        signal_arr = df["signal_entry"].values
+        levels_arr = df["levels"].values
 
+        meta = INSTRUMENT_META[symbol]
+        point_size = meta["point"]
+        pip_value = meta["pip_value"]
+
+        n = len(df)
+
+        for direction in ("long", "short"):
+            dir_flag = 1 if direction == "long" else -1
+            last_exit_by_tag = {}
+
+            for entry_pos in range(n):
+                sig = signal_arr[entry_pos]
+                if not isinstance(sig, dict) or sig.get("direction") != direction:
+                    continue
+
+                entry_tag = sig["tag"]
+                entry_time = time_arr[entry_pos]
+
+                last_exit = last_exit_by_tag.get(entry_tag)
+                if last_exit is not None and last_exit > entry_time:
+                    continue
+
+                levels = levels_arr[entry_pos]
                 if not isinstance(levels, dict):
                     continue
 
-                sl = levels.get("SL") or levels.get("sl") or levels.get("stop") or levels.get(0)
-                tp1 = levels.get("TP1") or levels.get("tp1") or levels.get(1)
-                tp2 = levels.get("TP2") or levels.get("tp2") or levels.get(2)
+                sl = (levels.get("SL") or levels.get(0))["level"]
+                tp1 = (levels.get("TP1") or levels.get(1))["level"]
+                tp2 = (levels.get("TP2") or levels.get(2))["level"]
 
-                if any(t['enter_tag'] == entry_tag and t['exit_time'] > entry_time for t in executed_trades):
-                    continue
+                entry_price = close_arr[entry_pos]
+                entry_price *= (1 + self.slippage) if direction == "long" else (1 - self.slippage)
 
-                entry_price = row['close'] * (1 + self.slippage) if direction == 'long' else row['close'] * (1 - self.slippage)
-                position_size = position_sizer(entry_price, sl["level"], max_risk=0.005, account_size=config.INITIAL_BALANCE, symbol=symbol)
+                position_size = position_sizer_fast(
+                    entry_price,
+                    sl,
+                    max_risk=0.005,
+                    account_size=config.INITIAL_BALANCE,
+                    point_size=point_size,
+                    pip_value=pip_value,
+                )
 
-                trade = Trade(symbol, direction, entry_time, entry_price, position_size, sl["level"], tp1["level"], tp2["level"], entry_tag)
+                trade = Trade(
+                    symbol,
+                    direction,
+                    entry_time,
+                    entry_price,
+                    position_size,
+                    sl,
+                    tp1,
+                    tp2,
+                    entry_tag,
+                    point_size,
+                    pip_value,
+                )
 
-                # --- Pętla po świecach ---
-                for i in range(entry_pos + 1, len(df)):
-                    candle = df.iloc[i]
-                    high, low, close, time = candle['high'], candle['low'], candle['close'], candle['time']
-                    atr = candle.get('atr', 0.0)
+                (
+                    exit_price,
+                    exit_time,
+                    tp1_exec,
+                    tp1_price,
+                    tp1_time,
+                ) = simulate_exit_numba(
+                    dir_flag,
+                    entry_pos,
+                    entry_price,
+                    sl,
+                    tp1,
+                    tp2,
+                    high_arr,
+                    low_arr,
+                    close_arr,
+                    time_arr,
+                )
 
-                    candle_range = high - low
-                    lower_shadow = min(candle['close'], candle['open']) - low
-                    upper_shadow = high - max(candle['close'], candle['open'])
-                    is_green = close > candle['open']
-                    is_red = close < candle['open']
+                trade.tp1_executed = tp1_exec
+                trade.tp1_price = tp1_price if tp1_exec else None
+                trade.tp1_time = tp1_time if tp1_exec else None
 
-                    small_upper_shadow = (upper_shadow / candle_range) < 0.35 if candle_range != 0 else False
-                    small_lower_shadow = (lower_shadow / candle_range) < 0.35 if candle_range != 0 else False
+                trade.close_trade(exit_price, exit_time, "exit")
 
-                    no_exit_long = is_green and small_upper_shadow
-                    no_exit_short = is_red and small_lower_shadow
-
-                    # Aktualizacja SL po TP1
-                    if trade.tp1_executed:
-                        trade.sl = trade.entry_price
-
-                    # LONG
-                    if direction == 'long':
-                        if not trade.tp1_executed and high >= trade.tp1 and not no_exit_long:
-                            trade.tp1_price = close
-                            trade.tp1_time = time
-                            trade.tp1_exit_reason = tp1['tag']
-                            trade.tp1_pnl = (trade.tp1_price - trade.entry_price) * (trade.position_size * 0.5)
-                            trade.tp1_executed = True
-                            trade.position_size *= 0.5
-
-                        if low <= trade.sl:
-                            trade.close_trade(trade.sl, time, 'BE after TP1' if trade.tp1_executed else sl['tag'])
-                            break
-
-                        if high >= trade.tp2 and not no_exit_long:
-                            trade.close_trade(close, time, tp2['tag'])
-                            break
-
-                    # SHORT
-                    elif direction == 'short':
-                        if not trade.tp1_executed and low <= trade.tp1 and not no_exit_short:
-                            trade.tp1_price = close
-                            trade.tp1_time = time
-                            trade.tp1_exit_reason = tp1['tag']
-                            trade.tp1_pnl = (trade.entry_price - trade.tp1_price) * (trade.position_size * 0.5)
-                            trade.tp1_executed = True
-                            trade.position_size *= 0.5
-
-                        if high >= trade.sl:
-                            trade.close_trade(trade.sl, time, 'BE after TP1' if trade.tp1_executed else sl['tag'])
-                            break
-
-                        if low <= trade.tp2 and not no_exit_short:
-                            trade.close_trade(close, time, tp2['tag'])
-                            break
-
-                # Jeśli nie zamknięto, zamykamy na ostatniej świecy
-                if trade.exit_price is None:
-                    last_candle = df.iloc[-1]
-                    exit_price = last_candle['close'] * (1 - self.slippage) if direction == 'long' else last_candle['close'] * (1 + self.slippage)
-                    trade.close_trade(exit_price, last_candle['time'], 'end_of_data')
-
-                # Blokada tagów
-                if trade.pnl < 0:
-                    blocked_tags.add(entry_tag)
-                elif trade.pnl > 0 and blocked_tags:
-                    blocked_tags.clear()
-
-                active_tags.discard(entry_tag)
                 trades.append(trade.to_dict())
-                executed_trades.append({'enter_tag': entry_tag, 'exit_time': trade.exit_time})
+                last_exit_by_tag[entry_tag] = trade.exit_time
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
         return pd.DataFrame(trades)
@@ -157,3 +161,4 @@ class Backtester:
                     traceback.print_exc()
 
         return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
+

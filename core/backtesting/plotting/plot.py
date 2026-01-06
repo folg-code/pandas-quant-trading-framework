@@ -40,11 +40,14 @@ class TradePlotter:
             "manual_exit": False,
         }
 
+
+
     # -------------------------------------------------
     # PUBLIC API
     # -------------------------------------------------
     def plot(self):
         self._add_candles()
+        self._add_pivots()
         self._add_trades()
         self._add_zones()
         self._add_extra_series()
@@ -69,6 +72,57 @@ class TradePlotter:
     # -------------------------------------------------
     # INTERNALS
     # -------------------------------------------------
+    def _add_pivots(self):
+        pivot_sources = [
+            ('pivot', {
+                3: {'color': 'red', 'label': 'HH'},
+                4: {'color': 'green', 'label': 'LL'},
+                5: {'color': 'red', 'label': 'LH'},
+                6: {'color': 'green', 'label': 'HL'},
+            })
+        ]
+
+        df = self.df.reset_index(drop=True)
+
+        for pivot_col, pivot_map in pivot_sources:
+            if pivot_col not in df.columns:
+                continue
+
+            for i, row in df.iterrows():
+                pivot_val = row.get(pivot_col)
+                if pivot_val not in pivot_map:
+                    continue
+
+                info = pivot_map[pivot_val]
+                start_idx = max(i - 15, 0)
+                end_idx = min(start_idx + 30, len(df) - 1)
+                x_values = [df['time'].iloc[start_idx], df['time'].iloc[end_idx]]
+
+                y_value = None
+                if pivot_val == 3:
+                    y_value = row.get('HH')
+                elif pivot_val == 4:
+                    y_value = row.get('LL')
+                elif pivot_val == 5:
+                    y_value = row.get('LH')
+                elif pivot_val == 6:
+                    y_value = row.get('HL')
+
+                if pd.isna(y_value):
+                    continue
+
+                self.fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=[y_value, y_value],
+                    mode='lines+text',
+                    line=dict(color=info['color'], width=1.5, dash='dash'),
+                    name=info['label'],
+                    text=[info['label'], None],
+                    textposition='top right',
+                    showlegend=False,
+                    hoverinfo='text'
+                ))
+
     def _add_candles(self):
         self.fig.add_trace(
             go.Candlestick(
