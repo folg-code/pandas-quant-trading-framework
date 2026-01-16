@@ -11,6 +11,7 @@ from core.domain.trade import Trade
 
 from core.domain.trade_exit import TradeExitResult
 from core.domain.execution import map_exit_code_to_reason
+from core.domain.trade_factory import TradeFactory
 
 INSTRUMENT_META = {
     "EURUSD": {
@@ -207,21 +208,25 @@ class Backtester:
                     tp1_time=exit_result.tp1_time,
                 )
 
-                # ==================================================
-                # APPLY RESULT TO TRADE (NO BEHAVIOR CHANGE)
-                # ==================================================
-                trade.tp1_executed = exit_result.tp1_executed
-                trade.tp1_price = exit_result.tp1_price
-                trade.tp1_time = exit_result.tp1_time
-                trade.tp1_pnl = legacy["tp1_pnl"]
-
-                trade.close_trade(
-                    exit_result.exit_price,
-                    exit_result.exit_time,
-                    legacy["exit_reason"],  # still legacy (INTENTIONAL)
+                # --- delegate trade creation ---
+                trade_dict = TradeFactory.create_trade(
+                    symbol=symbol,
+                    direction=direction,
+                    entry_time=entry_time,
+                    entry_price=entry_price,
+                    entry_tag=entry_tag,
+                    position_size=position_size,
+                    sl=sl,
+                    tp1=tp1,
+                    tp2=tp2,
+                    point_size=point_size,
+                    pip_value=pip_value,
+                    exit_result=exit_result,
+                    legacy_exit_reason=legacy["exit_reason"],
+                    tp1_pnl=legacy["tp1_pnl"],
                 )
 
-                trades.append(trade.to_dict())
+                trades.append(trade_dict)
                 last_exit_by_tag[entry_tag] = exit_time
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
