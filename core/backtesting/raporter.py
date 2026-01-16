@@ -80,14 +80,37 @@ class BacktestReporter:
         # --- TP / SL logic ---
 
         def parse_exit_tag(tag: str):
-            if tag.startswith("SL"):
-                return "SL", tag.split("_")[1], "final"
+            """
+            Supports both legacy tags (SL_xxx, TP1_xxx_yyy)
+            and new domain tags (SL, TP2, BE, TIMEOUT).
+            """
 
-            if tag.startswith("TP1"):
-                return "TP1", tag.split("_")[2], "partial"
+            if not isinstance(tag, str):
+                return "UNKNOWN", None, None
 
-            if tag.startswith("TP2"):
-                return "TP2", tag.split("_")[2], "final"
+            parts = tag.split("_")
+
+            if tag == "SL":
+                return "SL", None, "final"
+
+            if tag == "TP2":
+                return "TP2", None, "final"
+
+            if tag == "BE":
+                return "BE", None, "final"
+
+            if tag == "TIMEOUT":
+                return "TIMEOUT", None, "final"
+
+            # ---- legacy fallback ----
+            if tag.startswith("SL") and len(parts) >= 2:
+                return "SL", parts[1], "final"
+
+            if tag.startswith("TP1") and len(parts) >= 3:
+                return "TP1", parts[2], "partial"
+
+            if tag.startswith("TP2") and len(parts) >= 3:
+                return "TP2", parts[2], "final"
 
             return "UNKNOWN", None, None
 

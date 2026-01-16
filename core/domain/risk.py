@@ -94,5 +94,3 @@ def position_sizer_fast(
 
     lot = risk_amount / (pip_distance * pip_value)
     return round(lot, 3)
-
-

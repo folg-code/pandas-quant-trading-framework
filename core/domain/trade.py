@@ -1,8 +1,7 @@
 from typing import Optional
-
 import numpy as np
 
-from core.utils.position_sizer import get_pip_value, get_point_size
+from core.domain.trade_exit import TradeExitResult
 
 
 class Trade:
@@ -36,6 +35,7 @@ class Trade:
         self.exit_time = None
         self.exit_price = None
         self.exit_reason = None
+        self.exit_level_tag = None
 
         self.tp1_executed = False
         self.tp1_price = None
@@ -45,10 +45,16 @@ class Trade:
         self.returns = 0.0
         self.duration_sec = 0.0
 
-    def close_trade(self, exit_price, exit_time, exit_reason):
-        self.exit_price = exit_price
-        self.exit_time = exit_time
-        self.exit_reason = exit_reason
+    def close_trade(self, exit_result: TradeExitResult):
+        self.exit_price = exit_result.exit_price
+        self.exit_time = exit_result.exit_time
+        self.exit_reason = exit_result.reason.value
+
+        self.tp1_executed = exit_result.tp1_executed
+        self.tp1_price = exit_result.tp1_price
+        self.tp1_time = exit_result.tp1_time
+        self.tp1_pnl = exit_result.tp1_pnl
+
         self._compute_pnl()
         self._compute_returns()
         self._compute_duration()
@@ -102,6 +108,7 @@ class Trade:
             "returns": self.returns,
             "entry_tag": self.entry_tag,
             "exit_tag": self.exit_reason,
+            "exit_level_tag": self.exit_level_tag,
             "tp1_price": self.tp1_price,
             "tp1_time": self.tp1_time,
             "tp1_pnl": getattr(self, "tp1_pnl", 0.0),
