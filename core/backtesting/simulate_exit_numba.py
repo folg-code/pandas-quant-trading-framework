@@ -35,7 +35,7 @@ def simulate_exit_numba(
         if direction == 1:  # LONG
             if (not tp1_executed) and high >= tp1_level:
                 tp1_executed = True
-                tp1_price = close
+                tp1_price = tp1_level
                 tp1_time = t
 
             if low <= sl:

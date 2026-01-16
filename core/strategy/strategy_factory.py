@@ -32,8 +32,7 @@ def create_strategy(symbol, df, config, provider):
             timeframe=tf,
             startup_candle_count=config.STARTUP_CANDLES,
             start=pd.Timestamp(config.TIMERANGE["start"], tz="UTC"),
-            end=pd.Timestamp(config.TIMERANGE["end"], tz="UTC"),
-            lookback=lookback
+            end=pd.Timestamp(config.TIMERANGE["end"], tz="UTC")
         )
 
     prepare_strategy(strategy, df, informative_dfs)

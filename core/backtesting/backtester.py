@@ -15,10 +15,16 @@ INSTRUMENT_META = {
         "point": 0.0001,
         "pip_value": 10.0,
     },
-    "XAUUSD": {
+    "GOLD": {
         "point": 0.01,
         "pip_value": 1.0,
     },
+    "USTECH100": {
+        "point": 0.01,          # lub 0.1 – zależnie od brokera
+        "pip_value": 1.0,         # wartość punktu
+        "contract_size": 1,
+    }
+
 }
 
 
@@ -85,6 +91,12 @@ class Backtester:
                 tp1 = (levels.get("TP1") or levels.get(1))["level"]
                 tp2 = (levels.get("TP2") or levels.get(2))["level"]
 
+                sl_tag = (levels.get("SL") or levels.get(0))["tag"]
+                tp1_tag = (levels.get("TP1") or levels.get(1))["tag"]
+                tp2_tag = (levels.get("TP2") or levels.get(2))["tag"]
+
+
+
                 entry_price = close_arr[entry_pos]
                 entry_price *= (1 + self.slippage) if direction == "long" else (1 - self.slippage)
 
@@ -116,7 +128,7 @@ class Backtester:
                     exit_time,
                     tp1_exec,
                     tp1_price,
-                    tp1_time,
+                    tp1_time,  # = tp1 level (bias-safe)
                 ) = simulate_exit_numba(
                     dir_flag,
                     entry_pos,
@@ -134,12 +146,40 @@ class Backtester:
                 trade.tp1_price = tp1_price if tp1_exec else None
                 trade.tp1_time = tp1_time if tp1_exec else None
 
-                trade.close_trade(exit_price, exit_time, "exit")
+
+                result = self.process_trade_exit(
+                    direction=direction,
+                    entry_price=entry_price,
+                    sl=sl,
+                    sl_tag=sl_tag,
+                    tp1=tp1,
+                    tp1_tag=tp1_tag,
+                    tp2=tp2,
+                    tp2_tag=tp2_tag,
+                    position_size=position_size,
+                    point_size=point_size,
+                    pip_value=pip_value,
+                    exit_price=exit_price,
+                    exit_time=exit_time,
+                    tp1_executed=tp1_exec,
+                    tp1_time=tp1_time,
+                )
+
+                trade.tp1_executed = tp1_exec
+                trade.tp1_time = result["tp1_time"]
+                trade.tp1_pnl = result["tp1_pnl"]
+
+                trade.close_trade(
+                    exit_price,
+                    exit_time,
+                    result["exit_reason"]
+                )
 
                 trades.append(trade.to_dict())
-                last_exit_by_tag[entry_tag] = trade.exit_time
+                last_exit_by_tag[entry_tag] = exit_time
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
+
         return pd.DataFrame(trades)
 
     def run(self) -> pd.DataFrame:
@@ -162,3 +202,70 @@ class Backtester:
 
         return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
 
+
+    @staticmethod
+    def process_trade_exit(
+            *,
+            direction: str,
+            entry_price: float,
+            sl: float,
+            sl_tag: str,
+            tp1: float,
+            tp1_tag: str,
+            tp2: float,
+            tp2_tag: str,
+            position_size: float,
+            point_size: float,
+            pip_value: float,
+            exit_price: float,
+            exit_time,
+            tp1_executed: bool,
+            tp1_time,
+    ):
+        """
+        Bias-safe post-processing trade exit.
+        Zakładamy:
+        - SL / TP1 / TP2 = limity
+        - BE = entry_price
+        """
+
+        # -------------------------------------------------
+        # EXIT REASON
+        # -------------------------------------------------
+        if exit_price == sl:
+            exit_reason = sl_tag
+        elif tp1_executed and exit_price == entry_price:
+            exit_reason = tp1_tag
+        elif exit_price == tp2:
+            exit_reason = tp2_tag
+        else:
+            # fallback defensywny
+            exit_reason = tp2_tag
+
+        # -------------------------------------------------
+        # TP1 PNL (50% pozycji)
+        # -------------------------------------------------
+        tp1_pnl = 0.0
+        tp1_exit_reason = None
+
+        if tp1_executed:
+            if direction == "long":
+                price_gain = tp1 - entry_price
+            else:
+                price_gain = entry_price - tp1
+
+            tp1_pnl = (
+                    price_gain / point_size
+                    * pip_value
+                    * position_size
+                    * 0.5
+            )
+
+            tp1_exit_reason = "TP1"
+
+        return {
+            "exit_reason": exit_reason,
+            "tp1_pnl": tp1_pnl,
+            "tp1_time": tp1_time if tp1_executed else None,
+            "tp1_exit_reason": tp1_exit_reason,
+        }

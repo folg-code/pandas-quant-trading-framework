@@ -17,7 +17,9 @@ def save_pip_cache(cache):
 
 def get_pip_value(symbol: str, lot_size=1.0, default_pip=10):
     """
-    Pobiera wartość pip dla symbolu. Korzysta z cache lub MT5.
+    Pobiera wartość 1 pip/point w USD dla symbolu w MT5, uniwersalnie:
+    - Forex: pip = 0.0001
+    - Metale / indeksy: pip = 1 lub point zależnie od instrumentu
     """
     cache = load_pip_cache()
     if symbol in cache:
@@ -27,7 +29,14 @@ def get_pip_value(symbol: str, lot_size=1.0, default_pip=10):
     if mt5.initialize():
         info = mt5.symbol_info(symbol)
         if info is not None:
-            pip_value = info.trade_tick_value * lot_size
+            # Jeśli instrument jest typowo forex (point << 0.01), liczymy pip = 0.0001
+            if info.point < 0.01:
+                ticks_per_pip = 0.0001 / info.point
+            else:
+                # dla metali i indeksów 1 point = 1 pip
+                ticks_per_pip = 1.0
+
+            pip_value = info.trade_tick_value * ticks_per_pip * lot_size
         mt5.shutdown()
 
     cache[symbol] = pip_value
@@ -67,5 +76,23 @@ def position_sizer(close, sl, max_risk, account_size, symbol,
     # Obliczenie wielkości pozycji
     lot_calc = risk_amount / (pip_distance * pip_value_per_lot)
     return round(lot_calc, 3)
+
+def position_sizer_fast(
+    close,
+    sl,
+    max_risk,
+    account_size,
+    point_size,
+    pip_value,
+    risk_is_percent=True,
+):
+    if close == sl:
+        return 0.0
+
+    pip_distance = abs(close - sl) / point_size
+    risk_amount = max_risk * account_size if risk_is_percent else max_risk
+
+    lot = risk_amount / (pip_distance * pip_value)
+    return round(lot, 3)
 
 

@@ -149,6 +149,7 @@ class TradePlotter:
         pnl=None,
         exit_reason=None,
     ):
+
         hover = (
             f"Entry tag: {trade.get('entry_tag')}<br>"
             f"Exit tag: {trade.get('exit_tag')}<br>"
@@ -174,26 +175,28 @@ class TradePlotter:
             col=1,
         )
 
-    def _add_trades(self):
-        for _, t in self.trades.iterrows():
-            # ENTRY
-            self._add_trade_marker(
-                t["entry_time"],
-                t["entry_price"],
-                t,
-                "Entry",
-                "black",
-                "circle",
-                showlegend=not self._legend_flags["Entry"],
+    def _connect(self, t0, p0, t1, p1):
+        if pd.notna(t0) and pd.notna(t1) and pd.notna(p0) and pd.notna(p1):
+            self.fig.add_trace(
+                go.Scatter(
+                    x=[t0, t1],
+                    y=[p0, p1],
+                    mode="lines",
+                    line=dict(color="gray", dash="dot"),
+                    showlegend=False,
+                ),
+                row=1,
+                col=1,
             )
-            self._legend_flags["Entry"] = True
 
-            # TP1
-            if pd.notna(t.get("tp1_time")):
+    def _add_trades(self):
+
+        def connect(t0, p0, t1, p1):
+            if pd.notna(t0) and pd.notna(t1) and pd.notna(p0) and pd.notna(p1):
                 self.fig.add_trace(
                     go.Scatter(
-                        x=[t["entry_time"], t["tp1_time"]],
-                        y=[t["entry_price"], t["tp1_price"]],
+                        x=[t0, t1],
+                        y=[p0, p1],
                         mode="lines",
                         line=dict(color="gray", dash="dot"),
                         showlegend=False,
@@ -202,21 +205,52 @@ class TradePlotter:
                     col=1,
                 )
 
+        for _, t in self.trades.iterrows():
+
+            # =========================
+            # ENTRY
+            # =========================
+            self._add_trade_marker(
+                x=t["entry_time"],
+                y=t["entry_price"],
+                trade=t,
+                marker_type="Entry",
+                color="black",
+                symbol="circle",
+                showlegend=not self._legend_flags["Entry"],
+            )
+            self._legend_flags["Entry"] = True
+
+            # =========================
+            # TP1 (jeśli istnieje)
+            # =========================
+            has_tp1 = pd.notna(t.get("tp1_time")) and pd.notna(t.get("tp1_price"))
+
+            if has_tp1:
+                # ENTRY -> TP1
+                connect(
+                    t["entry_time"], t["entry_price"],
+                    t["tp1_time"], t["tp1_price"]
+                )
+
                 self._add_trade_marker(
-                    t["tp1_time"],
-                    t["tp1_price"],
-                    t,
-                    "TP1",
-                    "blue",
-                    "square",
+                    x=t["tp1_time"],
+                    y=t["tp1_price"],
+                    trade=t,
+                    marker_type="TP1",
+                    color="blue",
+                    symbol="square",
                     showlegend=not self._legend_flags["TP1"],
-                    pnl=t["tp1_pnl"],
+                    pnl=t.get("tp1_pnl"),
                     exit_reason=t.get("tp1_exit_reason"),
                 )
                 self._legend_flags["TP1"] = True
 
-            # EXIT
-            exit_tag = t.get("exit_tag", "")
+            # =========================
+            # FINAL EXIT (TP2 / SL / BE)
+            # =========================
+            exit_tag = str(t.get("exit_tag", "")).upper()
+
             if "TP" in exit_tag:
                 color, symbol, key = "blue", "triangle-down", "custom_TP"
             elif "SL" in exit_tag:
@@ -224,13 +258,25 @@ class TradePlotter:
             else:
                 color, symbol, key = "gray", "x", "manual_exit"
 
+            # TP1 -> EXIT  OR  ENTRY -> EXIT
+            if has_tp1:
+                connect(
+                    t["tp1_time"], t["tp1_price"],
+                    t["exit_time"], t["exit_price"]
+                )
+            else:
+                connect(
+                    t["entry_time"], t["entry_price"],
+                    t["exit_time"], t["exit_price"]
+                )
+
             self._add_trade_marker(
-                t["exit_time"],
-                t["exit_price"],
-                t,
-                key,
-                color,
-                symbol,
+                x=t["exit_time"],
+                y=t["exit_price"],
+                trade=t,
+                marker_type=key,
+                color=color,
+                symbol=symbol,
                 showlegend=not self._legend_flags[key],
             )
             self._legend_flags[key] = True

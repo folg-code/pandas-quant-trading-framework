@@ -51,4 +51,7 @@ class MT5Backend:
         df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
         return df.reset_index(drop=True)
 
+    def shutdown(self):
+        self.shutdown_mt5()
+
 

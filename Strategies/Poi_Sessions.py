@@ -2,224 +2,529 @@ import numpy as np
 import pandas as pd
 import talib.abstract as ta
 
+
 from core.strategy.BaseStrategy import BaseStrategy
 from TechnicalAnalysis.Indicators import indicators as qtpylib
 from Strategies.utils.decorators import informative
-from TechnicalAnalysis.Indicators.indicators import candlestick_confirmation
+from TechnicalAnalysis.Indicators.indicators import candlestick_confirmation, keltner_channel
 from TechnicalAnalysis.PointOfInterestSMC.core import SmartMoneyConcepts
-from TechnicalAnalysis.PriceAction_Fibbonaci.core import PriceStructureDetector
-from TechnicalAnalysis.SessionsSMC.core import SessionsSMC
+from TechnicalAnalysis.PriceAction_Fibbonaci.core import IntradayMarketStructure
+from TechnicalAnalysis.Sessions.core import Sessions
+from time import perf_counter
+
+
+
+
+
+def log_t(start, label):
+    print(f"{label:<35} {(perf_counter() - start):.3f}s")
 
 
 class PoiSessions(BaseStrategy):
 
     def __init__(self, df, symbol, startup_candle_count, provider):
-        super().__init__(df, symbol, startup_candle_count,provider)
-        self.smc = SmartMoneyConcepts(self.df)
-        self.sessions = SessionsSMC(self.df)
-        self.price_action = PriceStructureDetector(self.df)
-        self.sessions_h1 = None
+        super().__init__(df, symbol, startup_candle_count, provider)
 
-    @informative('H1')
-    def populate_indicators_H1(self, df: pd.DataFrame):
+    @informative('M30')
+    def populate_indicators_M30(self, df: pd.DataFrame):
 
-        df['atr'] = ta.ATR(df, 14)
+        # --- porządek czasowy
+        df.sort_values("time", inplace=True)
+
+        # --- podstawy HTF
         df['idx'] = df.index
+        df['atr'] = ta.ATR(df, 14)
 
-        self.smc.df = df.copy()
-        self.smc.find_validate_zones(tf="H1")
+        heikinashi = qtpylib.heikinashi(df)
+        df[['ha_open', 'ha_close', 'ha_high', 'ha_low']] = heikinashi[['open', 'close', 'high', 'low']]
 
-        self.sessions_h1 = SessionsSMC(df.copy())
-        self.sessions_h1.df = self.sessions_h1.calculate_previous_ranges()
+        # =====================================================
+        # 7️⃣ CISD
+        # =====================================================
+
+        df['min_5'] = df['low'].rolling(5).min()
+        df['max_5'] = df['high'].rolling(5).max()
+
+
+        first_high = df['high'].shift(2)
+        first_low = df['low'].shift(2)
+
+        df.loc[df['high'] < first_low, 'cisd_bull_line'] = first_low
+        df.loc[df['low'] > first_high, 'cisd_bear_line'] = first_high
+
+        df['cisd_bull_line'] = df['cisd_bull_line'].ffill()
+        df['cisd_bear_line'] = df['cisd_bear_line'].ffill()
+
+
+
+        # --- sesje HTF
+        #Sessions().apply(df)
+
+        # --- price action HTF
+        IntradayMarketStructure().apply(df)
+
+
+        # 🔥 SMC: TYLKO DETEKCJA STREF
+        self.htf_zones = SmartMoneyConcepts().detect_zones(
+            df,
+            tf="M30"
+        )
+
+        df = Sessions.calculate_previous_ranges(df)
+        df = Sessions.calculate_sessions_ranges(df)
 
         return df
 
     def populate_indicators(self):
 
-
-
-        self.df['idx'] = self.df.index
-        self.df['atr'] = ta.ATR(self.df, 14)
-        heikinashi = qtpylib.heikinashi(self.df)
-        self.df[['ha_open', 'ha_close', 'ha_high', 'ha_low']] = heikinashi[['open', 'close', 'high', 'low']]
-
-        self.df = self.df.join(candlestick_confirmation(self.df))
-
-
-        first_high = self.df['high'].shift(2)
-        first_low = self.df['low'].shift(2)
-
-        min_15 = self.df['low'].rolling(15).min()
-        max_15 = self.df['high'].rolling(15).max()
-
-        self.df['min_5']  = self.df['low'].rolling(5).min()
-        self.df['max_5'] = self.df['high'].rolling(5).max()
-
-        self.df['sl_long'] = min_15 - self.df['atr'] #* 0.5
-        self.df['sl_short'] = max_15 + self.df['atr'] #* 0.5
-
-        cisd_bull_cond = ((self.df['high'] < first_low))
-        cisd_bear_cond = ((self.df['low'] > first_high))
-
-        self.df.loc[cisd_bull_cond, 'cisd_bull_line'] = first_low
-        self.df.loc[cisd_bear_cond, 'cisd_bear_line'] = first_high
-
-        self.df[f'cisd_bull_line'] = self.df[f'cisd_bull_line'].ffill()
-        self.df[f'cisd_bear_line'] = self.df[f'cisd_bear_line'].ffill()
-
-        low_conf = (self.df[['open', 'close']].min(axis=1) - self.df['low'].rolling(15).min() < self.df['atr'] * 3)
-        self.df['low_conf'] = low_conf
-
-        high_conf = (self.df['high'].rolling(15).max() - self.df[['open', 'close']].max(axis=1) < self.df['atr'] * 3)
-        self.df['high_conf'] = high_conf
-
-        # Aktualizujemy również na M5
-        self.smc.df = self.df.copy()
-        self.smc.find_validate_zones(tf="M5")
-        self.smc.detect_reaction()
+        t0 = perf_counter()
+        df = self.df.copy()
+        df.sort_values("time", inplace=True)
+        log_t(t0, "start / copy + sort")
 
 
 
-        def merge_flags(prefix):
-            return self.smc.df[f"{prefix}_reaction_H1"] | self.smc.df[f"{prefix}_in_zone_H1"], \
-                   self.smc.df[f"{prefix}_reaction"] | self.smc.df[f"{prefix}_in_zone"]
 
-        for side in ["bullish", "bearish"]:
-            for zone in ["breaker", "fvg", "ob"]:
-                self.smc.df[f"{side}_{zone}_H1"], self.smc.df[f"{side}_{zone}"] = merge_flags(f"{side}_{zone}")
+        # =====================================================
+        # 1️⃣ PODSTAWY (tanie, używane wszędzie)
+        # =====================================================
+        t = perf_counter()
+        df['idx'] = df.index
 
-        def active_cols(df, side, timeframe):
-            cols = [f"{side}_breaker{timeframe}", f"{side}_ob{timeframe}", f"{side}_fvg{timeframe}"]
-            return df[cols].apply(lambda x: [col.split("_")[1].upper() for col in x.index if x[col]], axis=1)
+        df['atr'] = ta.ATR(df, 14)
+        df['atr_2'] = ta.ATR(df, 110)
+        df['atr_ratio'] = df['atr'] / df['atr_2']
+        log_t(t, "ATR + atr_ratio")
+        # =====================================================
+        # 5️⃣ HEIKIN + KELTNER (czysto techniczne)
+        # =====================================================
+        t = perf_counter()
+        #ha = qtpylib.heikinashi(df)
+        #df[['ha_open', 'ha_close', 'ha_high', 'ha_low']] = ha[['open', 'close', 'high', 'low']]
 
-        self.smc.df["htf_long_active"] = active_cols(self.smc.df, "bullish", "_H1")
-        self.smc.df["ltf_long_active"] = active_cols(self.smc.df, "bullish", "")
-        self.smc.df["htf_short_active"] = active_cols(self.smc.df, "bearish", "_H1")
-        self.smc.df["ltf_short_active"] = active_cols(self.smc.df, "bearish", "")
+        #kc = qtpylib.keltner_channel(df, 30, 3)
+        #df["kc_upper"] = kc["upper"]
+        #df["kc_middle"] = kc["mid"]
+        #df["kc_lower"] = kc["lower"]
 
-        self.sessions.df = self.df.copy()
-        self.sessions.calculate_sessions_ranges()
+        typical = (df['high'] + df['low'] + df['close']) / 3
 
-        if self.sessions_h1 is not None:
-            self.sessions.df = pd.merge_asof(
-                self.sessions.df.sort_values('time'),
-                self.sessions_h1.df.sort_values('time'),
-                on='time',
-                direction='backward',
-                suffixes=('', '_H1')
+        bb = qtpylib.bollinger_bands(typical, 30, 2.5)
+        df["bb_upper"] = bb["upper"]
+        df["bb_middle"] = bb["mid"]
+        df["bb_lower"] = bb["lower"]
+
+        #vwap = qtpylib.vwap_bands(df)
+
+        #df['vwap_upper_1'] = vwap["upper_1.0"]
+        #df['vwap_upper_2'] = vwap["upper_2.0"]
+
+        #df['vwap_lower_1'] = vwap["lower_1.0"]
+        #df['vwap_lower_2'] = vwap["lower_2.0"]
+
+        log_t(t, "Heikin + Keltner + vwap")
+
+        # =====================================================
+        # 6️⃣ CANDLE / STRUCTURE HELPERS
+        # =====================================================
+
+        #df = df.join(candlestick_confirmation(df))
+
+        first_high = df['high'].shift(2)
+        first_low = df['low'].shift(2)
+
+        df['low_5'] = df['low'].rolling(5).min()
+        df['high_5'] = df['high'].rolling(5).max()
+
+        df['low_15'] = df['low'].rolling(15).min()
+        df['high_15'] = df['high'].rolling(15).max()
+
+
+        # =====================================================
+        # 7️⃣ CISD
+        # =====================================================
+        t = perf_counter()
+        df.loc[df['high'] < first_low, 'cisd_bull_line'] = first_low
+        df.loc[df['low'] > first_high, 'cisd_bear_line'] = first_high
+
+        df['cisd_bull_line'] = df['cisd_bull_line'].ffill()
+        df['cisd_bear_line'] = df['cisd_bear_line'].ffill()
+
+        #log_t(t, "CISD")
+
+        # =====================================================
+        # 2️⃣ SESJE (M5)
+        # =====================================================
+
+        t = perf_counter()
+        #df = Sessions().apply(df)
+        #log_t(t, "Sessions")
+
+
+        # =====================================================
+        # 3️⃣ PRICE ACTION (M5)
+        # =====================================================
+        t = perf_counter()
+        IntradayMarketStructure().apply(df)
+        #log_t(t, "IntradayMarketStructure")
+
+        df = df.copy()
+        # =====================================================
+        # 4️⃣ SMART MONEY CONCEPTS (M5)
+        # =====================================================
+        t = perf_counter()
+        #smc = SmartMoneyConcepts()
+
+        #smc.apply_reactions(
+        #    df,
+        #    zones=self.htf_zones  # ← Z M30
+        #)
+
+        #smc.aggregate_active_zones(df)
+        #log_t(t, "SMC reactions + aggregate")
+
+        df = df.copy()
+
+
+        # =====================================================
+        # 8️⃣ REACTION CONTEXT
+        # =====================================================
+        t = perf_counter()
+        oc_min = np.minimum(df['open'], df['close'])
+        oc_max = np.maximum(df['open'], df['close'])
+
+        # ==================================================
+        # 3️⃣ REACTION
+        # ==================================================
+        df = self.calculate_reaction(
+            df,
+            context_dir_col="pa_event_dir",
+            reaction_window=5,
+        )
+
+
+        atr_threshold = 1
+
+        LEVELS = [
+            # ===== LONG =====
+            ("near_pdl_M30", "PDL_M30", "long"),
+            ("near_pwl_M30", "PWL_M30", "long"),
+            ("near_eql", "EQL_level", "long"),
+            ("near_eql_M30", "EQL_level_M30", "long"),
+            ("near_ll_M30", "LL_M30", "long"),
+            ("near_1272", "fibo_local_1272", "long"),
+            ("near_1272_M30", "fibo_local_1272_M30", "long"),
+            ("near_1618", "fibo_local_1618", "long"),
+            ("near_1618_M30", "fibo_local_1618_M30", "long"),
+
+            # ===== SHORT =====
+            ("near_pdh_M30", "PDH_M30", "short"),
+            ("near_pwh_M30", "PWH_M30", "short"),
+            ("near_eqh", "EQH_level", "short"),
+            ("near_eqh_M30", "EQH_level_M30", "short"),
+            ("near_hh_M30", "HH_M30", "short"),
+            ("near_1272_bear", "fibo_local_1272_bear", "short"),
+            ("near_1272_bear_M30", "fibo_local_1272_bear_M30", "short"),
+            ("near_1618_bear", "fibo_local_1618_bear", "short"),
+            ("near_1618_bear_M30", "fibo_local_1618_bear_M30", "short"),
+        ]
+
+        for out_col, level_col, direction in LEVELS:
+            df[out_col] = self.near_factory(
+                df = df,
+                level_col=level_col,
+                direction=direction,
+                atr_threshold=atr_threshold,
+                reaction_window=5,
             )
 
-        self.sessions.detect_session_type()
-        self.sessions.calculate_prev_day_type(method='atr', atr_period=14)
-        self.sessions.detect_signals()
+        df["location_long"] = (
+                df["in_discount_M30"] |
+                df["in_discount"] |
+                df["near_pdl_M30"] |
+                df["near_pwl_M30"] |
+                df["near_eql_M30"] |
+                df["near_eql"] |
+                df["near_ll_M30"] |
+                df["near_1272"] |
+                df["near_1272_M30"] |
+                df["near_1618"] |
+                df["near_1618_M30"]
+        )
 
-        self.sessions.df["prev_day_direction"] = np.where(self.sessions.df["prev_close"] > self.sessions.df["prev_open"], "bullish",
-                                            np.where(self.sessions.df["prev_close"] < self.sessions.df["prev_open"], "bearish", None))
-        self.sessions.df["session_bias"] = np.where(self.sessions.df["close"] > self.sessions.df["PDH"], "bullish",
-                                      np.where(self.sessions.df["close"] < self.sessions.df["PDL"], "bearish", "neutral"))
+        df["location_short"] = (
+                df["in_premium_M30"] |
+                df["in_premium"] |
+                df["near_pdh_M30"] |
+                df["near_pwh_M30"] |
+                df["near_eqh_M30"] |
+                df["near_eqh"] |
+                df["near_hh_M30"] |
+                df["near_1272_bear"] |
+                df["near_1272_bear_M30"] |
+                df["near_1618_bear"] |
+                df["near_1618_bear_M30"]
+        )
 
-        self.price_action.run_full_detection()
+        low_conf = (df[['open', 'close']].min(axis=1) - df['low'].rolling(15).min() < df['atr'] * 3)
+        df['low_conf'] = low_conf
 
+        high_conf = (df['high'].rolling(15).max() - df[['open', 'close']].max(axis=1) < df['atr'] * 3)
+        df['high_conf'] = high_conf
 
+        #log_t(t, "reaction context")
 
-
-
-
+        #log_t(t0, "populate_indicators TOTAL")
+        self.df = df
 
     def populate_entry_trend(self):
-        """
-        Buduje sygnały wejścia łączące:
-        - kierunek sesyjny (sessions_signal)
-        - kierunek dnia (prev_day_direction)
-        - bias rynkowy (session_bias)
-        - strefy HTF/LTF (OB, FVG, Breaker)
-        """
-
-        self.merge_external_dfs()
 
         df = self.df.copy()
 
+        # ==================================================
+        # 0️⃣ INIT
+        # ==================================================
+        df[[
+            "intent_event", "intent_type", "intent_dir",
+            "location", "signal_entry", "levels",
+            "rev_dir", "cont_dir"
+        ]] = None
+
+        VALID_EVENT = df["pa_event_type"].notna()
+        is_mss = VALID_EVENT & (df["pa_event_type"] == "mss")
+        is_bos = VALID_EVENT & (df["pa_event_type"] == "bos")
+
+        # ==================================================
+        # 1️⃣ EVENT + BASE DIR
+        # ==================================================
+        df.loc[is_mss, "intent_event"] = "mss"
+        df.loc[is_bos, "intent_event"] = "bos"
+
+        # MSS
+        df.loc[is_mss & (df.pa_event_dir == "bull"), ["rev_dir", "cont_dir"]] = ["short", "long"]
+        df.loc[is_mss & (df.pa_event_dir == "bear"), ["rev_dir", "cont_dir"]] = ["long", "short"]
+
+        # BOS
+        df.loc[is_bos & (df.pa_event_dir == "bull"), ["rev_dir", "cont_dir"]] = ["short", "long"]
+        df.loc[is_bos & (df.pa_event_dir == "bear"), ["rev_dir", "cont_dir"]] = ["long", "short"]
+
+        # ==================================================
+        # 2️⃣ PA LEVEL
+        # ==================================================
+        df["pa_level"] = np.nan
+        df.loc[is_mss & (df.pa_event_dir == "bull"), "pa_level"] = df["mss_bull_level"]
+        df.loc[is_mss & (df.pa_event_dir == "bear"), "pa_level"] = df["mss_bear_level"]
+        df.loc[is_bos & (df.pa_event_dir == "bull"), "pa_level"] = df["bos_bull_level"]
+        df.loc[is_bos & (df.pa_event_dir == "bear"), "pa_level"] = df["bos_bear_level"]
 
 
 
-        # --- 🔹 4. Inicjalizacja sygnałów ---
-        df["signal_entry"] = None
+        # ==================================================
+        # 4️⃣ EXECUTION CONDITIONS
+        # ==================================================
+        rev_long_ok = (df.rev_dir == "long") & (df.low < df.pa_level) & (df.close > df.open) & df['low_conf']
+        rev_short_ok = (df.rev_dir == "short") & (df.high > df.pa_level) & (df.close < df.open) & df['high_conf']
 
-        # --- 🔹 5. Maski logiczne ---
-        long_mask = (
-                #(df["sessions_signal"] == "long") &
-                (df["price_action_signal"] == "long") &
-                #((df["sr_signal"] == "short")
-                #(df["pa_fake_break_signal"] == "long") &
-                #((df["session_bias"] == "bullish") | (df["prev_day_direction"] == "bullish")) &
-                (df['candle_bullish'].notna()) &
-                ((df["htf_long_active"].apply(len) > 0)
-                 | (df["ltf_long_active"].apply(len) > 0)
-                ) &
-                (df['low_conf'] == True)
-        )
+        cont_long_ok = (df.cont_dir == "long") & (df.low >= df.pa_level)
+        cont_short_ok = (df.cont_dir == "short") & (df.high <= df.pa_level)
 
-        short_mask = (
-                #(df["sessions_signal"] == "short") &
-                (df["price_action_signal"] == "short") &
-                #((df["sr_signal"] == "long")
-                #(df["pa_fake_break_signal"] == "short") &
-                #((df["session_bias"] == "bearish") | (df["prev_day_direction"] == "bearish")) &
-                (df['candle_bearish'].notna()) &
-                (df['low_conf'] == True)&
+        # ==================================================
+        # 5️⃣ INTENT (PRIORITY)
+        # ==================================================
+        df.loc[rev_long_ok, ["intent_type", "intent_dir"]] = ["reversal", "long"]
+        df.loc[rev_short_ok, ["intent_type", "intent_dir"]] = ["reversal", "short"]
 
-                ((df["htf_short_active"].apply(len) > 0)
-                 | (df["ltf_short_active"].apply(len) > 0)
-                 )
-        )
+        mask_free = df.intent_type.isna()
 
-        # --- 🔹 6. Generowanie sygnałów + scoring ---
-        def build_entry(row, direction):
-            htf = row[f"htf_{direction}_active"]
-            ltf = row[f"ltf_{direction}_active"]
-            score = len(htf) + len(ltf)
+        #df.loc[cont_long_ok & mask_free, ["intent_type", "intent_dir"]] = ["continuation", "long"]
+        #df.loc[cont_short_ok & mask_free, ["intent_type", "intent_dir"]] = ["continuation", "short"]
 
-            candle_context = (
-                row["candle_bullish"] if direction == "long" else row["candle_bearish"]
+        # ==================================================
+        # 6️⃣ LOCATION (TERAZ MA SENS)
+        # ==================================================
+        def resolve_location(row):
+            if row.intent_dir == "long":
+                if row.near_eql: return "eql"
+                if row.near_eql_M30: return "eql_m30"
+                if row.near_pdl_M30: return "pdl"
+                if row.near_pwl_M30: return "pwl"
+                if row.near_ll_M30: return "ll_M30"
+                if row.near_1272: return "fibo_1272"
+                if row.near_1272_M30: return "fibo_1272_M30"
+                if row.near_1618: return "fibo_1618"
+                if row.near_1618_M30: return "fibo_1618_M30"
+                if row.in_discount_M30 or row.in_discount: return "discount"
+                return "none"
+
+            if row.intent_dir == "short":
+                if row.near_eqh: return "eqh"
+                if row.near_eqh_M30: return "eqh_M30"
+                if row.near_pdh_M30: return "pdh"
+                if row.near_pwh_M30: return "pwh"
+                if row.near_hh_M30: return "hh_M30"
+                if row.near_1272_bear: return "fibo_1272_bear"
+                if row.near_1272_bear_M30: return "fibo_1272_bear_M30"
+                if row.near_1618_bear: return "fibo_1618_bear"
+                if row.near_1618_bear_M30: return "fibo_1618_bear_M30"
+                if row.in_premium_M30 or row.in_premium: return "premium"
+                return "none"
+
+            return None
+
+        mask_intent = df.intent_dir.notna()
+        df.loc[mask_intent, "location"] = df.loc[mask_intent].apply(resolve_location, axis=1)
+
+        # ==================================================
+        # WHITELIST CONFIG
+        # ==================================================
+
+        USE_WHITELIST = True  # <-- jednym ruchem włączasz / wyłączasz
+
+        WHITELIST = {
+            "core": {
+                "long": {
+                    "bull": {
+                        "bos": {"eql", "discount", "fibo_1272", "fibo_1618", "pdl"},
+                        "mss": {"eql", "discount", "fibo_1272", "fibo_1618"},
+                    },
+                    "range": {
+                        "mss": {"eql", "discount"},
+                    },
+                },
+                "short": {
+                    "bear": {
+                        "bos": {"eqh", "premium", "fibo_1272", "fibo_1618", "pdh"},
+                        "mss": {"eqh", "premium", "fibo_1272", "fibo_1618"},
+                    },
+                    "range": {
+                        "mss": {"eqh", "premium"},
+                    },
+                },
+            },
+
+            "counter_trend": {
+                "long": {
+                    "bear": {
+                        "bos": {"eql", "fibo_1618", "pdl"},
+                        "mss": {"eql", "fibo_1618", "pdl"},
+                    },
+                },
+                "short": {
+                    "bull": {
+                        "bos": {"eqh", "fibo_1618", "pdh"},
+                        "mss": {"eqh", "fibo_1618", "pdh"},
+                    },
+                },
+            },
+        }
+
+        def is_whitelisted(direction, intent_type, intent_event, htf_regime, location):
+
+            # ==========================
+            # GUARD: no intent → no whitelist
+            # ==========================
+            if (
+                    intent_type is None
+                    or intent_event is None
+                    or direction is None
+                    or htf_regime is None
+                    or location is None
+            ):
+                return False, None
+
+            if not USE_WHITELIST:
+                return True, "disabled"
+
+            event = intent_event.lower()
+            regime = htf_regime.lower()
+
+            # --- CORE ---
+            core = WHITELIST["core"]
+            if (
+                    direction in core
+                    and regime in core[direction]
+                    and event in core[direction][regime]
+                    and location in core[direction][regime][event]
+            ):
+                return True, "core"
+
+            # --- COUNTER TREND ---
+            ct = WHITELIST["counter_trend"]
+            if (
+                    direction in ct
+                    and regime in ct[direction]
+                    and event in ct[direction][regime]
+                    and location in ct[direction][regime][event]
+            ):
+                return True, "counter_trend"
+
+            return False, None
+
+        def apply_whitelist(row):
+            allowed, wl_class = is_whitelisted(
+                direction=row.intent_dir,
+                intent_type=row.intent_type,
+                intent_event=row.intent_event,
+                htf_regime=row.market_regime_M30,
+                location=row.location,
             )
-            tag = (#f"{row['session_context']}"
-                   f"__{row['price_action_context']}"
-                   #f"__{row['sessions_signal']}"
-                    #f"__{row['pa_fake_break_context']}"
-                    #f"__{row['sr_context']}"
-                   #f"__{row['session_bias']}"
-                   f"__HTF:{'-'.join(htf)}"
-                   f"__LTF:{'-'.join(ltf)}"
-                   f"__{candle_context}"
-            )
-            return {"direction": direction, "tag": tag}, score
+            return pd.Series({
+                "is_whitelisted": allowed,
+                "whitelist_class": wl_class,
+            })
 
-        # --- Dla LONG ---
-        res_long = df.loc[long_mask].apply(lambda r: pd.Series(build_entry(r, "long")), axis=1)
-        if not res_long.empty:
-            res_long.columns = ["signal_entry", "signal_strength"]
-            df.loc[res_long.index, "signal_entry"] = res_long["signal_entry"]
-            df.loc[res_long.index, "signal_strength"] = res_long["signal_strength"]
-
-        # --- Dla SHORT ---
-        res_short = df.loc[short_mask].apply(lambda r: pd.Series(build_entry(r, "short")), axis=1)
-        if not res_short.empty:
-            res_short.columns = ["signal_entry", "signal_strength"]
-            df.loc[res_short.index, "signal_entry"] = res_short["signal_entry"]
-            df.loc[res_short.index, "signal_strength"] = res_short["signal_strength"]
-
-        print(f"✅ Signals generated: {df['signal_entry'].notna().sum()}")
-
-        # --- 🔹 7. Poziomy SL/TP ---
-        has_signals = df["signal_entry"].apply(bool)
-        df.loc[has_signals, "levels"] = df.loc[has_signals].apply(
-            lambda row: self.calculate_levels(row["signal_entry"], row["close"], row["sl_long"], row['sl_short']),
+        df[["is_whitelisted", "whitelist_class"]] = df.apply(
+            apply_whitelist,
             axis=1
         )
+        # ==================================================
+        # 8️⃣ BUILD SIGNAL
+        # ==================================================
 
+        valid = df.intent_type.notna()
 
+        def build_signal(r):
+
+            # ----------------------------------
+            # PA MODE FILTER
+            # ----------------------------------
+
+            if r.intent_type == "reversal":
+                # każdy reversal MUSI mieć poprawny PA-counter context
+                if not r['pa_counter_allowed']:
+                    return None
+
+            if r.intent_type == "continuation":
+                if not r['pa_continuation_allowed']:
+                    return None
+
+            return {
+                "direction": r.intent_dir,
+                "whitelist_class": r.whitelist_class,
+                "tag": (
+                    f"{r.intent_dir}"
+                    f"__{r.intent_type}"
+                    f"__{r.intent_event}"
+                    f"__HTF:{r.market_regime_M30}"
+                    f"__loc:{r.location}"
+                ),
+            }
+
+        df.loc[valid, "signal_entry"] = df.loc[valid].apply(build_signal, axis=1)
+
+        df.loc[df.signal_entry.notna(), "levels"] = df.loc[df.signal_entry.notna()].apply(
+            lambda r: self.calculate_levels(
+                r.signal_entry,
+                r,
+                tp1=1.5,
+                tp2=3.0,
+            ),
+            axis=1,
+        )
 
         self.df = df
+
+        print(df.loc[df['signal_entry'].notna()])
         return df
 
     def populate_exit_trend(self):
@@ -229,117 +534,350 @@ class PoiSessions(BaseStrategy):
         df['signal_exit'] = None
 
     def bool_series(self):
-        return []
+        return [
+            #("bos_up", self.price_action.df['bos_up'], "green"),
+            #("bos_down", self.price_action.df['bos_down'], "red"),
+            #("mss_up", self.price_action.df['mss_up'], "blue"),
+            #("mss_down", self.price_action.df['mss_down'], "purple"),
+        ]
 
     def get_extra_values_to_plot(self):
         return [
-            ("london_high", self.sessions.df["london_high"], "blue", "dot"),
-            ("london_low", self.sessions.df["london_low"], "blue", "dot"),
-            ("asia_high", self.sessions.df["asia_high"], "purple", "dot"),
-            ("asia_low", self.sessions.df["asia_low"], "purple", "dot"),
-            ("ny_high", self.sessions.df["ny_high"], "orange", "dash"),
-            ("ny_low", self.sessions.df["ny_low"], "orange", "dash"),
+            ("bb_upper", self.df["bb_upper"], "blue", "dot"),
+            #("london_low", self.sessions.df["london_low"], "blue", "dot"),
+            ("bb_lower", self.df["bb_lower"], "purple", "dot"),
+            #("asia_low", self.sessions.df["asia_low"], "purple", "dot"),
+            #("ny_high", self.sessions.df["ny_high"], "orange", "dash"),
+            #("ny_low", self.sessions.df["ny_low"], "orange", "dash"),
 
-            #("mss_bear_10", self.price_action.df['mss_bear_10'], "pink"),
-            #("bos_bear_10", self.price_action.df['bos_bear_10'], "red"),
-            #("mss_bull_10", self.price_action.df['mss_bull_10'], "yellow"),
-            #("bos_bull_10", self.price_action.df['bos_bull_10'], "orange"),
+            #("vwap_upper_1", self.df['vwap_upper_1'], "green"),
+            #("vwap_lower_1", self.df['vwap_lower_1'], "red"),
 
-            #("PDH", self.sessions.df["PDH"], "blue"),
+            #("vwap_upper_2", self.df['vwap_upper_2'], "green"),
+            #("vwap_lower_2", self.df['vwap_lower_2'], "red"),
+
+            ("bos_up", self.df['bos_bull_level'], "green"),
+            ("bos_bear", self.df['bos_bear_level'], "red"),
+            ("mss_bull", self.df['mss_bull_level'], "purple"),
+            ("mss_bear", self.df['mss_bear_level'], "yellow"),
+
+            ("bos_up_M30", self.df['bos_bull_level_M30'], "green"),
+            ("bos_bear_M30", self.df['bos_bear_level_M30'], "red"),
+            ("mss_bull_M30", self.df['mss_bull_level_M30'], "purple"),
+            ("mss_bear_M30", self.df['mss_bear_level_M30'], "yellow"),
+
+            #("pivot_price", self.price_action.df["pivot_price"], "purple"),
             #("PDL", self.sessions.df["PDL"], "blue"),
 
-            #("PWH", self.sessions.df["PWH"], "yellow"),
+            #("prev_price", self.price_action.df["prev_price"], "yellow"),
             #("PWL", self.sessions.df["PWL"], "yellow"),
         ]
 
     def get_bullish_zones(self):
+        z = self._zones_view()
+
         return [
-             #("Bullish IFVG H1", self.smc.bullish_ifvg_validated_H1, "rgba(255, 160, 122, 0.7)"),
-            # Pomarańcz (pozostawiony bez zmian)
-             #("Bullish IFVG", self.smc.bullish_ifvg_validated, "rgba(139, 0, 0, 1)"),
-
-             #("Bullish FVG H1", self.smc.bullish_fvg_validated_H1, "rgba(255, 152, 0, 0.7)"),  # Jasnoniebieski
-             #("Bullish FVG", self.smc.bullish_fvg_validated, "rgba(255, 152, 0, 0.7)"),             # Ciemnoniebieski
-
-            #("Bullish OB H1", self.smc.bullish_ob_validated_H1, "rgba(144, 238, 144, 0.7)"),  # Jasnozielony
-             ("Bullish OB", self.smc.bullish_ob_validated, "rgba(0, 100, 0, 1)"),           # Ciemnozielony
-
-            #("Bullish Breaker H1", self.smc.bullish_breaker_validated_H1, "rgba(173, 216, 230, 0.7)"),  # Jasnoniebieski
-             #("Bullish Breaker", self.smc.bullish_breaker_validated, "rgba(0, 0, 139, 1)"),             # Ciemnoniebieski
-
-            # ("Bullish GAP ", self.bullish_gap_validated, "rgba(56, 142, 60, 1)"),
+            #(
+            #    "Bullish OB M30",
+            #    z.select(direction="bullish", zone_type="ob", tf="M30"),
+            #    "rgba(144, 238, 144, 0.7)"
+            #),
+            #(
+            #    "Bullish Breaker M30",
+            #    z.select(direction="bullish", zone_type="breaker", tf="M30"),
+            #    "rgba(173, 216, 230, 0.7)"
+            #),
         ]
 
     def get_bearish_zones(self):
-        return [
-             #("Bearish Breaker", self.smc.bearish_breaker_validated, "rgba(64, 64, 64, 1)"),      # Ciemnoszary
-            #("Bearish Breaker H1", self.smc.bearish_breaker_validated_H1, "rgba(169, 169, 169, 0.7)"),  # Jasnoszary
+        z = self._zones_view()
 
-             ("Bearish OB", self.smc.bearish_ob_validated, "rgba(139, 0, 0, 1)"),                # Ciemnoczerwony
-            #("Bearish OB H1", self.smc.bearish_ob_validated_H1, "rgba(255, 160, 122, 0.7)"),  # Jasnoczerwony
+        """return [
+            (
+                "Bearish OB M30",
+                z.select(direction="bearish", zone_type="ob", tf="M30"),
+                "rgba(255, 160, 122, 0.7)"
+            ),
+            (
+                "Bearish Breaker M30",
+                z.select(direction="bearish", zone_type="breaker", tf="M30"),
+                "rgba(169, 169, 169, 0.7)"
+            ),
+        ]"""
 
-             #("Bearish IFVG H1", self.smc.bearish_ifvg_validated_H1, "rgba(139, 0, 0, 1)"),  # Pomarańcz (pozostawiony bez zmian)
-             #("Bearish IFVG", self.smc.bearish_ifvg_validated, "rgba(255, 160, 122, 0.7)"),
+    def compute_sl(
+            self,
+            *,
+            row,
+            direction,
+            min_atr_mult=0.5,
+            min_pct=0.001,
+    ):
+        """
+        Zwraca:
+        - sl_level
+        - sl_source: 'struct' | 'min'
+        """
 
-             #("Bearish FVG", self.smc.bearish_fvg_validated, "rgba(0, 0, 139, 1)"),      # Ciemnoszary
-             #("Bearish FVG H1", self.smc.bearish_fvg_validated_H1, "rgba(173, 216, 230, 0.7)"),  # Jasnoszary
-        ]
+        close = row["close"]
+        atr = row["atr"]
 
+        # =========================
+        # SL STRUKTURALNY
+        # =========================
 
-    def calculate_levels(self, signals, close,  sl_long, sl_short):
+        if direction == "long":
+            sl_structural = min(row["low_15"], row["low_5"]) - atr * 0.5
+        else:
+            sl_structural = max(row["high_15"], row["high_5"]) + atr * 0.5
+
+        # =========================
+        # MINIMALNY SL
+        # =========================
+
+        min_sl_atr = atr * min_atr_mult
+        min_sl_pct = close * min_pct
+        min_distance = max(min_sl_atr, min_sl_pct)
+
+        if direction == "long":
+            sl_min = close - min_distance
+
+            if sl_structural < sl_min:
+                return sl_structural, "struct"
+            else:
+                return sl_min, "min"
+
+        else:
+            sl_min = close + min_distance
+
+            if sl_structural > sl_min:
+                return sl_structural, "struct"
+            else:
+                return sl_min, "min"
+
+    def calculate_levels(self, signals, row, tp1, tp2):
 
         if not isinstance(signals, dict):
             return None
 
-        direction = signals.get("direction")
-        tag = signals.get("tag")
+        direction = signals["direction"]
+        close = row["close"]
+
+        sl, sl_source = self.compute_sl(
+            row=row,
+            direction=direction,
+            min_atr_mult=1,
+            min_pct=0.001
+        )
+
+        risk = abs(close - sl)
+
+        # ============================
+        # MICROSTRUCTURE-AWARE TP
+        # ============================
+        micro_regime = row.get("microstructure_regime_M30", "normal")
+        tp1_mult, tp2_mult = self.tp_multipliers_by_micro_regime(micro_regime)
+
+        tp1_r = tp1 * tp1_mult
+        tp2_r = tp2 * tp2_mult
 
         if direction == "long":
-            sl = sl_long
-            tp1 = close + (close - sl_long) * 1
-            tp2 = close + (close - sl_long) * 2
+            tp1_level = close + risk * 1.5
+            tp2_level = close + risk * 3
         else:
-            sl = sl_short
-            tp1 = close - (sl_short - close) * 1
-            tp2 = close - (sl_short - close) * 2
+            tp1_level = close - risk * 1.5
+            tp2_level = close - risk * 3
 
         return {
-            "SL": {"level": sl, "tag": "auto"},
-            "TP1": {"level": tp1, "tag": "RR_1:2"},
-            "TP2": {"level": tp2, "tag": "RR_1:4"},
+            "SL": {
+                "level": sl,
+                "tag": f"SL_{sl_source}"
+            },
+            "TP1": {
+                "level": tp1_level,
+                "tag": f"TP1_{micro_regime}_from_{sl_source}"
+            },
+            "TP2": {
+                "level": tp2_level,
+                "tag": f"TP2_{micro_regime}_from_{sl_source}"
+            },
         }
 
-    def merge_external_dfs(self):
+    def tp_multipliers_by_micro_regime(self, micro_regime):
         """
-        Łączy dane z:
-        - self.smc.df (kolumny: htf/ltf active)
-        - self.sessions.df (kolumny: sygnały i kontekst)
-        - self.price_action.df (kolumny: price_action_context, price_action_signal)
+        Returns (tp1_mult, tp2_mult)
+        """
+        return {
+            "compression": (1.0, 3.5),  # czekamy na ekspansję
+            "expansion": (1.2, 4.0),  # pozwalamy jechać
+            "normal": (1.0, 3.0),  # baseline
+            "exhaustion": (0.8, 2.0),  # szybciej realizujemy
+        }.get(micro_regime, (1.0, 3.0))
+
+    def calculate_reaction(
+            self,
+            df: pd.DataFrame,
+            *,
+            context_dir_col: str,
+            reaction_window: int = 5,
+            atr_disp_mult: float = 1.0,
+            atr_candle_mult: float = 2.0,
+            body_ratio_min: float = 0.6,
+    ) -> pd.DataFrame:
+        """
+        STRUCTURAL REACTION DETECTOR (NO LEVEL KNOWLEDGE)
+
+        Outputs:
+            - has_reaction : bool (event)
+            - reaction_type : str | None
+            - ext_idx : index of last extremum
         """
 
-        base = self.df.copy()
+        df = df.copy()
+        ctx = df[context_dir_col]
+        df["_idx"] = np.arange(len(df))
 
+        # ======================================================
+        # 1️⃣ LOCAL EXTREMUM (PAST-ONLY)
+        # ======================================================
 
+        is_local_high = df["high"] == df["high"].rolling(reaction_window).max()
+        is_local_low = df["low"] == df["low"].rolling(reaction_window).min()
 
-        # --- 1️⃣ self.smc.df ---
-        if hasattr(self, "smc") and hasattr(self.smc, "df"):
-            smc_cols = ['htf_long_active', 'ltf_long_active', 'htf_short_active', 'ltf_short_active']
-            smc_df = self.smc.df[['time'] + [c for c in smc_cols if c in self.smc.df.columns]]
-            base = base.merge(smc_df, on='time', how='left', validate='1:1')
+        df["ext_open"] = np.nan
+        df["ext_idx"] = np.nan
 
-        # --- 2️⃣ self.sessions.df ---
-        if hasattr(self, "sessions") and hasattr(self.sessions, "df"):
-            sessions_cols = ['sessions_signal', 'session_context', 'signal_strength',
-                             'prev_day_direction', 'session_bias']
-            sessions_df = self.sessions.df[['time'] + [c for c in sessions_cols if c in self.sessions.df.columns]]
-            base = base.merge(sessions_df, on='time', how='left', validate='1:1')
+        df.loc[is_local_high & (ctx == "bull"), "ext_open"] = df["open"]
+        df.loc[is_local_low & (ctx == "bear"), "ext_open"] = df["open"]
 
-        # --- 3️⃣ self.price_action.df ---
-        if hasattr(self, "price_action") and hasattr(self.price_action, "df"):
-            pa_cols = ['price_action_context', 'price_action_signal',
-                       'sr_context', 'sr_signal',
-                       'pa_fake_break_context', 'pa_fake_break_signal']
-            pa_df = self.price_action.df[['time'] + [c for c in pa_cols if c in self.price_action.df.columns]]
-            base = base.merge(pa_df, on='time', how='left', validate='1:1')
+        df.loc[is_local_high & (ctx == "bull"), "ext_idx"] = df["_idx"]
+        df.loc[is_local_low & (ctx == "bear"), "ext_idx"] = df["_idx"]
 
-        self.df = base
+        df["ext_open"] = df["ext_open"].ffill()
+        df["ext_idx"] = df["ext_idx"].ffill()
+
+        bars_since_ext = df["_idx"] - df["ext_idx"]
+        valid_window = (bars_since_ext > 0) & (bars_since_ext <= reaction_window)
+
+        # ======================================================
+        # 2️⃣ OPEN BREAK
+        # ======================================================
+
+        reaction_open_break = (
+                valid_window &
+                (
+                        ((ctx == "bull") & (df["close"] < df["ext_open"])) |
+                        ((ctx == "bear") & (df["close"] > df["ext_open"]))
+                )
+        )
+
+        # ======================================================
+        # 3️⃣ DISPLACEMENT
+        # ======================================================
+
+        reaction_displacement = (
+                valid_window &
+                (
+                        ((ctx == "bull") & ((df["ext_open"] - df["close"]) > atr_disp_mult * df["atr"])) |
+                        ((ctx == "bear") & ((df["close"] - df["ext_open"]) > atr_disp_mult * df["atr"]))
+                )
+        )
+
+        # ======================================================
+        # 4️⃣ STRONG OPPOSITE CANDLE
+        # ======================================================
+
+        candle_range = df["high"] - df["low"]
+        candle_body = (df["close"] - df["open"]).abs()
+        body_ratio = candle_body / candle_range.replace(0, np.nan)
+
+        direction_ok = (
+                ((ctx == "bull") & (df["close"] < df["open"])) |
+                ((ctx == "bear") & (df["close"] > df["open"]))
+        )
+
+        reaction_strong_candle = (
+                (candle_range > atr_candle_mult * df["atr"]) &
+                (body_ratio > body_ratio_min) &
+                direction_ok
+        )
+
+        # ======================================================
+        # OUTPUT
+        # ======================================================
+
+        df["reaction_open_break"] = reaction_open_break
+        df["reaction_displacement"] = reaction_displacement
+        df["reaction_strong_candle"] = reaction_strong_candle
+
+        df["has_reaction"] = (
+                reaction_open_break |
+                reaction_displacement |
+                reaction_strong_candle
+        )
+
+        df["reaction_type"] = np.select(
+            [
+                reaction_open_break,
+                reaction_strong_candle,
+                reaction_displacement,
+            ],
+            [
+                "open_break",
+                "strong_candle",
+                "displacement",
+            ],
+            default=None
+        )
+
+        return df
+
+    def near_factory(
+            self,
+            df: pd.DataFrame,
+            level_col: str,
+            direction: str,  # "long" / "short"
+            atr_col: str = "atr",
+            atr_threshold: float = 1.0,
+            reaction_window: int = 5,
+    ) -> pd.Series:
+        """
+        NEAR =
+        1) price within ATR distance
+        OR
+        2) level sweep + reaction within window
+
+        Fully causal.
+        """
+
+        price = df["low"] if direction == "long" else df["high"]
+        level = df[level_col]
+
+        # ============================
+        # 1️⃣ ATR DISTANCE
+        # ============================
+
+        near_atr = (price - level).abs() / df[atr_col] <= atr_threshold
+
+        # ============================
+        # 2️⃣ LEVEL SWEEP
+        # ============================
+
+        sweep = (
+            (df["high"] > level) if direction == "short"
+            else (df["low"] < level)
+        )
+
+        sweep_idx = np.where(sweep, df["idx"], np.nan)
+        sweep_idx = pd.Series(sweep_idx, index=df.index).ffill()
+
+        bars_since_sweep = df["idx"] - sweep_idx
+        valid_window = (bars_since_sweep >= 0) & (bars_since_sweep <= reaction_window)
+
+        sweep_and_react = (
+                valid_window &
+                sweep_idx.notna() &
+                df["has_reaction"]
+        )
+
+        return near_atr | sweep_and_react

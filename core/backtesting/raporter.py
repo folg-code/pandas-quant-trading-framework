@@ -12,6 +12,8 @@ from rich.console import Console
 from rich.table import Table
 from datetime import timedelta
 
+from config import BACKTEST_MODE
+
 
 class BacktestReporter:
 
@@ -57,6 +59,58 @@ class BacktestReporter:
         self.min_balance = self.trades["equity"].min()
         self.max_drawdown = self.trades["drawdown"].max()
 
+    def _aggregate_entry_tag(self, df: pd.DataFrame) -> dict:
+        trades = len(df)
+        if trades == 0:
+            return None
+
+        # equity curve per tag
+        equity = self.initial_balance + df["pnl_usd"].cumsum()
+        running_max = equity.cummax()
+        drawdown = (running_max - equity).max()
+
+        wins = df[df["pnl_usd"] > 0]
+        losses = df[df["pnl_usd"] < 0]
+
+        win_rate = len(wins) / trades if trades else 0
+        avg_win = wins["pnl_usd"].mean() if not wins.empty else 0
+        avg_loss = losses["pnl_usd"].mean() if not losses.empty else 0
+        expectancy = win_rate * avg_win - (1 - win_rate) * abs(avg_loss)
+
+        # --- TP / SL logic ---
+
+        def parse_exit_tag(tag: str):
+            if tag.startswith("SL"):
+                return "SL", tag.split("_")[1], "final"
+
+            if tag.startswith("TP1"):
+                return "TP1", tag.split("_")[2], "partial"
+
+            if tag.startswith("TP2"):
+                return "TP2", tag.split("_")[2], "final"
+
+            return "UNKNOWN", None, None
+
+        df[["exit_event", "sl_source", "exit_stage"]] = df["exit_tag"].apply(
+            lambda t: pd.Series(parse_exit_tag(t))
+        )
+
+        pct_sl = (df["exit_event"] == "SL").mean() * 100
+        pct_be = (df["exit_event"] == "TP1").mean() * 100
+        pct_tp2 = (df["exit_event"] == "TP2").mean() * 100
+
+        profit_pct = (equity.iloc[-1] / self.initial_balance - 1) * 100
+
+        return {
+            "trades": trades,
+            "profit_pct": profit_pct,
+            "pct_be": pct_be,
+            "pct_tp2": pct_tp2,
+            "pct_sl": pct_sl,
+            "exp": expectancy,
+            "drawdown": drawdown,
+        }
+
     # ------------------------------------------------------------------
     # CORE AGGREGATION LOGIC
     # ------------------------------------------------------------------
@@ -81,7 +135,8 @@ class BacktestReporter:
         losses = df[df["pnl_usd"] < 0]
         draws = df[df["pnl_usd"] == 0]
 
-        win_rate = len(wins) / len(df)
+        effective_trades = len(wins) + len(losses)
+        win_rate = (len(wins) / effective_trades) if effective_trades > 0 else 0
 
         avg_win = wins["pnl_usd"].mean() if not wins.empty else 0
         avg_loss = losses["pnl_usd"].mean() if not losses.empty else 0
@@ -226,7 +281,50 @@ class BacktestReporter:
     # PUBLIC REPORTS
     # ------------------------------------------------------------------
     def print_entry_tag_stats(self):
-        self._print_group_table("ENTER TAG STATS", "entry_tag", self.trades)
+        self.console.rule("[bold yellow]ENTER TAG STATS[/bold yellow]")
+
+        rows = []
+
+        for tag, g in self.trades.groupby("entry_tag"):
+            stats = self._aggregate_entry_tag(g)
+            if stats is None:
+                continue
+
+            rows.append({
+                "entry_tag": tag,
+                **stats
+            })
+
+        if not rows:
+            self.console.print("⚠️ No entry tag data.")
+            return
+
+        # 🔑 SORTOWANIE PO TOTAL PROFIT %
+        rows = sorted(rows, key=lambda x: x["profit_pct"], reverse=True)
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Entry Tag")
+        table.add_column("Trades", justify="right")
+        table.add_column("TOT Profit %", justify="right")
+        table.add_column("%BE", justify="right")
+        table.add_column("%TP2", justify="right")
+        table.add_column("%SL", justify="right")
+        table.add_column("Exp $", justify="right")
+        table.add_column("Max DD $", justify="right")
+
+        for r in rows:
+            table.add_row(
+                str(r["entry_tag"]),
+                f"{r['trades']}",
+                f"{r['profit_pct']:.2f}",
+                f"{r['pct_be']:.1f}",
+                f"{r['pct_tp2']:.1f}",
+                f"{r['pct_sl']:.1f}",
+                f"{r['exp']:.2f}",
+                f"{r['drawdown']:.2f}",
+            )
+
+        self.console.print(table)
 
     def print_exit_reason_stats(self):
         self._print_group_table("EXIT REASON STATS", "exit_tag", self.trades)
@@ -254,21 +352,249 @@ class BacktestReporter:
             self.trades
         )
 
+    def print_entry_tag_split_table(self, mode: str = "filtered"):
+        """
+        mode:
+            - 'filtered' : tylko stabilne / decyzyjne tagi (default)
+            - 'all'      : wszystkie tagi (diagnostyka)
+        """
+
+        if "window" not in self.trades.columns:
+            self.console.print("⚠️ Split report requires 'window' column in trades.")
+            return
+
+        self.console.rule(
+            "[bold yellow]ENTRY TAG — STABILITY FILTERED[/bold yellow]"
+            if mode == "filtered"
+            else "[bold yellow]ENTRY TAG — FULL DIAGNOSTIC VIEW[/bold yellow]"
+        )
+
+        # --- aggregate ---
+        grouped = self.trades.groupby(["entry_tag", "window"])
+        data = {}
+
+        for (tag, window), g in grouped:
+            stats = self._aggregate_entry_tag(g)
+            if stats is None:
+                continue
+            data.setdefault(tag, {})[window] = stats
+
+        rows = []
+
+        # --- scoring ---
+        def score_window(opt, val, fin):
+            score = 0.0
+
+            # trades (data reliability)
+            if opt and opt["trades"] >= 50:
+                score += 1
+            if val and val["trades"] >= 30:
+                score += 1
+            if fin and fin["trades"] >= 30:
+                score += 1
+
+            # EV persistence
+            if opt and opt["exp"] > 0:
+                score += 2
+            if val and val["exp"] > 0:
+                score += 2
+            if fin and fin["exp"] > 0:
+                score += 1
+
+            return score
+
+        # --- collect rows ---
+        for tag, windows in data.items():
+            opt = windows.get("OPT")
+            val = windows.get("VAL")
+            fin = windows.get("FINAL")
+
+            if not opt:
+                continue
+
+            score = score_window(opt, val, fin)
+
+            if mode == "filtered":
+                if opt["trades"] < 50:
+                    continue
+                if val and val["trades"] < 30:
+                    continue
+                if opt["exp"] <= 0:
+                    continue
+                if score <= 4:
+                    continue
+
+            rows.append((tag, score, opt, val, fin))
+
+        if not rows:
+            self.console.print("⚠️ No entry tags to display.")
+            return
+
+        # --- sorting ---
+        if mode == "filtered":
+            rows.sort(key=lambda r: r[1], reverse=True)
+        else:
+            rows.sort(
+                key=lambda r: (
+                    -(r[4]["exp"] if r[4] else -1e9),  # FINAL EV first
+                    -r[1]  # then stability score
+                )
+            )
+
+        # --- table ---
+        table = Table(show_header=True, header_style="bold magenta")
+
+        table.add_column("Entry Tag", style="bold")
+        table.add_column("Score", justify="right")
+        table.add_column("Trades OPT", justify="right")
+        table.add_column("Trades VAL", justify="right")
+        table.add_column("Trades FINAL", justify="right")
+
+        metrics = [
+            ("%TP2", "pct_tp2", True),
+            ("%SL", "pct_sl", True),
+            ("Exp $", "exp", False),
+        ]
+
+        for name, _, _ in metrics:
+            table.add_column(f"{name} OPT", justify="right")
+            table.add_column(f"{name} VAL", justify="right")
+            table.add_column(f"{name} FINAL", justify="right")
+
+        def fmt(w, key, pct=False):
+            if not w:
+                return "—"
+            v = w[key]
+            return f"{v:.1f}" if pct else f"{v:.2f}"
+
+        # --- render rows ---
+        for tag, score, opt, val, fin in rows:
+            row = [
+                tag,
+                f"{score:.1f}",
+                str(opt["trades"]),
+                str(val["trades"]) if val else "—",
+                str(fin["trades"]) if fin else "—",
+            ]
+
+            for _, key, pct in metrics:
+                row.extend([
+                    fmt(opt, key, pct),
+                    fmt(val, key, pct),
+                    fmt(fin, key, pct),
+                ])
+
+            table.add_row(*row)
+
+        self.console.print(table)
+
+    def print_entry_tag_split_report(self):
+        """
+        ENTRY TAG performance per backtest window (OPT / VAL / FINAL)
+        """
+
+        if "window" not in self.trades.columns:
+            self.console.print("⚠️ Split report requires 'window' column in trades.")
+            return
+
+        self.console.rule("[bold yellow]ENTRY TAG SPLIT PERFORMANCE[/bold yellow]")
+
+        rows = []
+
+        grouped = self.trades.groupby(["entry_tag", "window"])
+
+        # { entry_tag: { window: stats } }
+        data = {}
+
+        for (tag, window), g in grouped:
+            stats = self._aggregate_entry_tag(g)
+            if stats is None:
+                continue
+
+            data.setdefault(tag, {})[window] = stats
+
+        for tag, windows in data.items():
+            opt = windows.get("OPT")
+            val = windows.get("VAL")
+            fin = windows.get("FINAL")
+
+            if not opt:
+                continue  # bez OPT tag nie istnieje
+
+            row = {
+                "entry_tag": tag,
+                "opt": opt["profit_pct"],
+                "val": val["profit_pct"] if val else None,
+                "final": fin["profit_pct"] if fin else None,
+                "delta_opt_val": (
+                    (val["profit_pct"] - opt["profit_pct"]) if val else None
+                ),
+                "delta_val_final": (
+                    (fin["profit_pct"] - val["profit_pct"]) if fin and val else None
+                ),
+                "trades": opt["trades"],
+            }
+
+            rows.append(row)
+
+        if not rows:
+            self.console.print("⚠️ No split entry tag data.")
+            return
+
+        # sort: najlepsze OPT na górze
+        rows = sorted(rows, key=lambda x: x["opt"], reverse=True)
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Entry Tag")
+        table.add_column("OPT %", justify="right")
+        table.add_column("VAL %", justify="right")
+        table.add_column("FINAL %", justify="right")
+        table.add_column("Δ OPT→VAL", justify="right")
+        table.add_column("Δ VAL→FINAL", justify="right")
+        table.add_column("Trades", justify="right")
+
+        for r in rows:
+            table.add_row(
+                r["entry_tag"],
+                f"{r['opt']:.2f}",
+                f"{r['val']:.2f}" if r["val"] is not None else "—",
+                f"{r['final']:.2f}" if r["final"] is not None else "—",
+                f"{r['delta_opt_val']:.2f}" if r["delta_opt_val"] is not None else "—",
+                f"{r['delta_val_final']:.2f}" if r["delta_val_final"] is not None else "—",
+                f"{r['trades']}",
+            )
+
+        self.console.print(table)
+
     # ------------------------------------------------------------------
     # RUN ALL REPORTS
     # ------------------------------------------------------------------
     def run(self):
-        self.console.rule("[bold cyan]SUMMARY METRICS[/bold cyan]")
 
-        self._print_summary_metrics()
+        if BACKTEST_MODE == "single":
+            self.console.rule("[bold cyan]SUMMARY METRICS[/bold cyan]")
 
-        self.console.rule("[bold cyan]DETAILED REPORTS[/bold cyan]")
+            self._print_summary_metrics()
 
-        self.print_entry_tag_stats()
-        self.print_exit_reason_stats()
-        self.print_tp1_entry_stats()
-        self.print_tp1_exit_stats()
-        self.print_symbol_report()
+            #self.console.rule("[bold cyan]DETAILED REPORTS[/bold cyan]")
+
+            self.print_entry_tag_stats()
+            self.print_exit_reason_stats()
+
+            # self.print_tp1_entry_stats()
+            # self.print_tp1_exit_stats()
+            self.print_symbol_report()
+        elif BACKTEST_MODE == "split":
+            self.console.rule("[bold cyan]SUMMARY METRICS[/bold cyan]")
+
+            self._print_summary_metrics()
+
+            if "window" in self.trades.columns:
+                self.print_entry_tag_split_table(mode="all")
+
+            self.print_exit_reason_stats()
+            self.print_symbol_report()
+
 
     def save(self, filename: str):
         os.makedirs(os.path.dirname(filename), exist_ok=True)

@@ -6,6 +6,7 @@ import pandas as pd
 
 import config
 from config import TIMEFRAME_MAP
+from core.backtesting.plotting.zones import ZoneView
 from core.live_trading.utils import parse_lookback
 
 
@@ -27,6 +28,9 @@ class BaseStrategy:
         self._informative_results = {}
         self.informatives = defaultdict(list)
         self._collect_informatives()
+
+        self.htf_zones = None  # DataFrame stref HTF
+        self.ltf_zones = None  # opcjonalnie, jeśli kiedyś zechcesz
 
     @classmethod
     def get_required_informatives(cls):
@@ -91,8 +95,7 @@ class BaseStrategy:
                 timeframe=tf,
                 startup_candle_count=self.startup_candle_count,
                 start = pd.Timestamp(config.TIMERANGE["start"], tz="UTC"),
-                end = pd.Timestamp(config.TIMERANGE["end"], tz="UTC"),
-                lookback=lookback
+                end = pd.Timestamp(config.TIMERANGE["end"], tz="UTC")
             )
 
 
@@ -127,3 +130,6 @@ class BaseStrategy:
             if getattr(method, "_informative", False):
                 tf = method._informative_timeframe
                 self.informatives[tf].append(method)
+
+    def _zones_view(self):
+        return ZoneView(self.htf_zones)

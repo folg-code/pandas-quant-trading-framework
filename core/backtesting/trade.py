@@ -104,5 +104,7 @@ class Trade:
             "exit_tag": self.exit_reason,
             "tp1_price": self.tp1_price,
             "tp1_time": self.tp1_time,
+            "tp1_pnl": getattr(self, "tp1_pnl", 0.0),
+            "tp1_exit_reason": getattr(self, "tp1_exit_reason", None),
             "duration": self.duration_sec,
         }
