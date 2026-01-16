@@ -1,6 +1,7 @@
 # core/live_trading_refactoring/position_manager.py
 
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from typing import Dict, Any
 
@@ -98,13 +99,40 @@ class PositionManager:
             if exit is None:
                 continue
 
-            # 1️⃣ Execute close
+            # -------------------------------
+            # TP1 (partial exit + BE)
+            # -------------------------------
+            if exit.reason is TradeExitReason.TP1:
+                # 1️⃣ partial close 50%
+                self.adapter.close_partial(
+                    ticket=trade["ticket"],
+                    volume=trade["volume"] * 0.5,
+                    price=exit.exit_price,
+                )
+
+                # 2️⃣ move SL to BE
+                self.adapter.modify_sl(
+                    ticket=trade["ticket"],
+                    new_sl=trade["entry_price"],
+                )
+
+                # 3️⃣ persist TP1 state
+                self.repo.mark_tp1_executed(
+                    trade_id=trade_id,
+                    tp1_price=exit.tp1_price,
+                    tp1_time=exit.tp1_time,
+                )
+
+                continue  # position still open
+
+            # -------------------------------
+            # FINAL EXIT (SL / TP2 / TIMEOUT)
+            # -------------------------------
             self.adapter.close_position(
                 ticket=trade["ticket"],
                 price=exit.exit_price,
             )
 
-            # 2️⃣ Persist exit
             self.repo.record_exit(
                 trade_id=trade_id,
                 exit_price=exit.exit_price,
@@ -118,55 +146,55 @@ class PositionManager:
         # ==================================================
 
     def _check_exit(self, trade: dict, market_state: dict) -> TradeExitResult | None:
-        """
-        Check SL / TP2 / TIMEOUT conditions.
-        """
-
         price = market_state["price"]
         now = market_state["time"]
 
         direction = trade["direction"]
         sl = trade["sl"]
+        tp1 = trade["tp1"]
         tp2 = trade["tp2"]
+        entry_price = trade["entry_price"]
 
         # --- SL ---
         if direction == "long" and price <= sl:
-            return TradeExitResult(
-                exit_price=price,
-                exit_time=now,
-                reason=TradeExitReason.SL,
-            )
+            return TradeExitResult(price, now, TradeExitReason.SL)
 
         if direction == "short" and price >= sl:
-            return TradeExitResult(
-                exit_price=price,
-                exit_time=now,
-                reason=TradeExitReason.SL,
-            )
+            return TradeExitResult(price, now, TradeExitReason.SL)
+
+        # --- TP1 (partial, only once) ---
+        if not trade["tp1_executed"]:
+            if direction == "long" and price >= tp1:
+                return TradeExitResult(
+                    exit_price=price,
+                    exit_time=now,
+                    reason=TradeExitReason.TP1,
+                    tp1_executed=True,
+                    tp1_price=price,
+                    tp1_time=now,
+                )
+
+            if direction == "short" and price <= tp1:
+                return TradeExitResult(
+                    exit_price=price,
+                    exit_time=now,
+                    reason=TradeExitReason.TP1,
+                    tp1_executed=True,
+                    tp1_price=price,
+                    tp1_time=now,
+                )
 
         # --- TP2 ---
         if direction == "long" and price >= tp2:
-            return TradeExitResult(
-                exit_price=price,
-                exit_time=now,
-                reason=TradeExitReason.TP2,
-            )
+            return TradeExitResult(price, now, TradeExitReason.TP2)
 
         if direction == "short" and price <= tp2:
-            return TradeExitResult(
-                exit_price=price,
-                exit_time=now,
-                reason=TradeExitReason.TP2,
-            )
+            return TradeExitResult(price, now, TradeExitReason.TP2)
 
-        # --- TIMEOUT (example: 24h) ---
+        # --- TIMEOUT ---
         entry_time = self._parse_time(trade["entry_time"])
         if now - entry_time > timedelta(hours=24):
-            return TradeExitResult(
-                exit_price=price,
-                exit_time=now,
-                reason=TradeExitReason.TIMEOUT,
-            )
+            return TradeExitResult(price, now, TradeExitReason.TIMEOUT)
 
         return None
 
@@ -178,6 +206,8 @@ class PositionManager:
     def _map_exit_level_tag(self, reason: TradeExitReason, trade: dict) -> str | None:
         if reason is TradeExitReason.SL:
             return "SL_live"
+        if reason is TradeExitReason.TP1:
+            return "TP1_live"
         if reason is TradeExitReason.TP2:
             return "TP2_live"
         return None

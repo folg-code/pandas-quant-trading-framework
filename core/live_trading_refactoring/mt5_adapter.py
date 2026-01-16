@@ -87,3 +87,16 @@ class MT5Adapter:
             return {}
 
         raise NotImplementedError("Real MT5 fetch not implemented")
+
+    def close_partial(
+            self,
+            *,
+            ticket: str,
+            volume: float,
+            price: float | None = None,
+    ) -> None:
+        if self.dry_run:
+            print(f"[DRY-RUN] PARTIAL CLOSE ticket={ticket} vol={volume} price={price}")
+            return
+
+        raise NotImplementedError("Real MT5 partial close not implemented")
