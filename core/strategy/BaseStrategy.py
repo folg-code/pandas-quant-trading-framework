@@ -1,6 +1,10 @@
+#core/strategy/BaseStrategy.py
+
 import inspect
 import time
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Optional, Literal
 
 import pandas as pd
 
@@ -9,6 +13,46 @@ from config import TIMEFRAME_MAP
 from core.backtesting.plotting.zones import ZoneView
 from core.live_trading.utils import parse_lookback
 
+# ==================================================
+# Strategy → Engine contract
+# ==================================================
+
+@dataclass(frozen=True)
+class TradePlan:
+    """
+    Immutable trade intent produced by a strategy.
+    """
+
+    symbol: str
+    direction: Literal["long", "short"]
+
+    entry_price: float
+    sl: float
+
+    tp1: Optional[float] = None
+    tp2: Optional[float] = None
+
+    volume: float = 0.0
+    entry_tag: str = ""
+
+    # who controls exits after entry
+    exit_mode: Literal["fixed", "managed"] = "fixed"
+
+    # 🔑 STRATEGY METADATA
+    strategy_name: str = ""
+    strategy_config: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TradeAction:
+    """
+    Action produced by managed-exit strategy.
+    """
+
+    action: Literal["move_sl", "close"]
+    price: float
+    reason: str
+
 
 class BaseStrategy:
     REQUIRED_COLUMNS = [
@@ -16,7 +60,14 @@ class BaseStrategy:
         "signal_entry", "signal_exit","levels"
     ]
 
-    def __init__(self, df, symbol, startup_candle_count=600, provider=None):
+    def __init__(
+            self,
+            df,
+            symbol,
+            startup_candle_count=600,
+            provider=None,
+            strategy_config: dict | None = None,
+    ):
         self.df = df.copy()
         self.symbol = symbol
         self.startup_candle_count = startup_candle_count
@@ -31,6 +82,25 @@ class BaseStrategy:
 
         self.htf_zones = None  # DataFrame stref HTF
         self.ltf_zones = None  # opcjonalnie, jeśli kiedyś zechcesz
+        self.strategy_config = strategy_config or {}
+
+    def generate_trade_plan(self, *, row: pd.Series) -> TradePlan | None:
+        """
+        Called on candle close.
+        Must return TradePlan or None.
+        """
+        return None
+
+    def manage_trade(
+            self,
+            *,
+            trade_state: dict,
+            market_state: dict,
+    ) -> TradeAction | None:
+        """
+        Called only for exit_mode='managed'.
+        """
+        return None
 
     @classmethod
     def get_required_informatives(cls):
@@ -133,3 +203,4 @@ class BaseStrategy:
 
     def _zones_view(self):
         return ZoneView(self.htf_zones)
+
