@@ -7,7 +7,7 @@ import os
 import MetaTrader5 as mt5
 
 from core.backtesting.simulate_exit_numba import simulate_exit_numba
-from core.utils.position_sizer import position_sizer, position_sizer_fast
+from core.domain.risk import position_sizer_fast
 from core.domain.trade import Trade
 
 INSTRUMENT_META = {
@@ -126,10 +126,11 @@ class Backtester:
                 (
                     exit_price,
                     exit_time,
+                    exit_code,
                     tp1_exec,
                     tp1_price,
-                    tp1_time,  # = tp1 level (bias-safe)
-                ) = simulate_exit_numba(
+                    tp1_time,
+                )= simulate_exit_numba(
                     dir_flag,
                     entry_pos,
                     entry_price,
