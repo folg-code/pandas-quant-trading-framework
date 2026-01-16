@@ -1,0 +1,2 @@
+class StrategyConfigError(Exception):
+    pass
