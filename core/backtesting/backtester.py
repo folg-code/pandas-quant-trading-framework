@@ -4,11 +4,13 @@ import pandas as pd
 import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
-import MetaTrader5 as mt5
 
 from core.backtesting.simulate_exit_numba import simulate_exit_numba
 from core.domain.risk import position_sizer_fast
 from core.domain.trade import Trade
+
+from core.domain.trade_exit import TradeExitResult
+from core.domain.execution import map_exit_code_to_reason
 
 INSTRUMENT_META = {
     "EURUSD": {
@@ -34,6 +36,34 @@ class Backtester:
 
     def __init__(self, slippage: float = 0.0):
         self.slippage = slippage
+
+    def _build_trade_exit_result(
+            self,
+            *,
+            entry_price: float,
+            exit_price: float,
+            exit_time,
+            exit_code: int,
+            tp1_executed: bool,
+            tp1_price,
+            tp1_time,
+    ) -> TradeExitResult:
+
+        reason = map_exit_code_to_reason(
+            exit_code=exit_code,
+            tp1_executed=tp1_executed,
+            exit_price=exit_price,
+            entry_price=entry_price,
+        )
+
+        return TradeExitResult(
+            exit_price=exit_price,
+            exit_time=exit_time,
+            reason=reason,
+            tp1_executed=tp1_executed,
+            tp1_price=tp1_price if tp1_executed else None,
+            tp1_time=tp1_time if tp1_executed else None,
+        )
 
     def run_backtest(self, df: pd.DataFrame, symbol: Optional[str] = None) -> pd.DataFrame:
         """Backtest dla jednego symbolu lub wielu symboli."""
@@ -130,7 +160,7 @@ class Backtester:
                     tp1_exec,
                     tp1_price,
                     tp1_time,
-                )= simulate_exit_numba(
+                ) = simulate_exit_numba(
                     dir_flag,
                     entry_pos,
                     entry_price,
@@ -143,12 +173,23 @@ class Backtester:
                     time_arr,
                 )
 
-                trade.tp1_executed = tp1_exec
-                trade.tp1_price = tp1_price if tp1_exec else None
-                trade.tp1_time = tp1_time if tp1_exec else None
+                # ==================================================
+                # NEW: domain exit result (FACT)
+                # ==================================================
+                exit_result = self._build_trade_exit_result(
+                    entry_price=entry_price,
+                    exit_price=exit_price,
+                    exit_time=exit_time,
+                    exit_code=exit_code,
+                    tp1_executed=tp1_exec,
+                    tp1_price=tp1_price,
+                    tp1_time=tp1_time,
+                )
 
-
-                result = self.process_trade_exit(
+                # ==================================================
+                # TEMPORARY LEGACY BRIDGE (PnL + tags)
+                # ==================================================
+                legacy = self.process_trade_exit(
                     direction=direction,
                     entry_price=entry_price,
                     sl=sl,
@@ -160,20 +201,24 @@ class Backtester:
                     position_size=position_size,
                     point_size=point_size,
                     pip_value=pip_value,
-                    exit_price=exit_price,
-                    exit_time=exit_time,
-                    tp1_executed=tp1_exec,
-                    tp1_time=tp1_time,
+                    exit_price=exit_result.exit_price,
+                    exit_time=exit_result.exit_time,
+                    tp1_executed=exit_result.tp1_executed,
+                    tp1_time=exit_result.tp1_time,
                 )
 
-                trade.tp1_executed = tp1_exec
-                trade.tp1_time = result["tp1_time"]
-                trade.tp1_pnl = result["tp1_pnl"]
+                # ==================================================
+                # APPLY RESULT TO TRADE (NO BEHAVIOR CHANGE)
+                # ==================================================
+                trade.tp1_executed = exit_result.tp1_executed
+                trade.tp1_price = exit_result.tp1_price
+                trade.tp1_time = exit_result.tp1_time
+                trade.tp1_pnl = legacy["tp1_pnl"]
 
                 trade.close_trade(
-                    exit_price,
-                    exit_time,
-                    result["exit_reason"]
+                    exit_result.exit_price,
+                    exit_result.exit_time,
+                    legacy["exit_reason"],  # still legacy (INTENTIONAL)
                 )
 
                 trades.append(trade.to_dict())
