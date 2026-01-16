@@ -7,11 +7,6 @@ import os
 
 from core.backtesting.simulate_exit_numba import simulate_exit_numba
 from core.domain.risk import position_sizer_fast
-from core.domain.trade import Trade
-
-from core.domain.trade_exit import TradeExitResult
-from core.domain.execution import map_exit_code_to_reason
-from core.domain.trade_factory import TradeFactory
 from core.domain.exit_processor import ExitProcessor
 from core.domain.trade_factory import TradeFactory
 
@@ -98,10 +93,11 @@ class Backtester:
                 tp1 = (levels.get("TP1") or levels.get(1))["level"]
                 tp2 = (levels.get("TP2") or levels.get(2))["level"]
 
-                sl_tag = (levels.get("SL") or levels.get(0))["tag"]
-                tp1_tag = (levels.get("TP1") or levels.get(1))["tag"]
-                tp2_tag = (levels.get("TP2") or levels.get(2))["tag"]
-
+                level_tags = {
+                    "SL": (levels.get("SL") or levels.get(0))["tag"],
+                    "TP1": (levels.get("TP1") or levels.get(1))["tag"],
+                    "TP2": (levels.get("TP2") or levels.get(2))["tag"],
+                }
 
 
                 entry_price = close_arr[entry_pos]
@@ -166,12 +162,16 @@ class Backtester:
                     point_size=point_size,
                     pip_value=pip_value,
                     exit_result=exit_result,
+                    level_tags=level_tags,
                 )
 
                 trades.append(trade_dict)
                 last_exit_by_tag[entry_tag] = exit_time
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
+
+        print(pd.DataFrame(trades)
+)
 
         return pd.DataFrame(trades)
 
@@ -195,70 +195,3 @@ class Backtester:
 
         return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
 
-
-    @staticmethod
-    def process_trade_exit(
-            *,
-            direction: str,
-            entry_price: float,
-            sl: float,
-            sl_tag: str,
-            tp1: float,
-            tp1_tag: str,
-            tp2: float,
-            tp2_tag: str,
-            position_size: float,
-            point_size: float,
-            pip_value: float,
-            exit_price: float,
-            exit_time,
-            tp1_executed: bool,
-            tp1_time,
-    ):
-        """
-        Bias-safe post-processing trade exit.
-        Zakładamy:
-        - SL / TP1 / TP2 = limity
-        - BE = entry_price
-        """
-
-        # -------------------------------------------------
-        # EXIT REASON
-        # -------------------------------------------------
-        if exit_price == sl:
-            exit_reason = sl_tag
-        elif tp1_executed and exit_price == entry_price:
-            exit_reason = tp1_tag
-        elif exit_price == tp2:
-            exit_reason = tp2_tag
-        else:
-            # fallback defensywny
-            exit_reason = tp2_tag
-
-        # -------------------------------------------------
-        # TP1 PNL (50% pozycji)
-        # -------------------------------------------------
-        tp1_pnl = 0.0
-        tp1_exit_reason = None
-
-        if tp1_executed:
-            if direction == "long":
-                price_gain = tp1 - entry_price
-            else:
-                price_gain = entry_price - tp1
-
-            tp1_pnl = (
-                    price_gain / point_size
-                    * pip_value
-                    * position_size
-                    * 0.5
-            )
-
-            tp1_exit_reason = "TP1"
-
-        return {
-            "exit_reason": exit_reason,
-            "tp1_pnl": tp1_pnl,
-            "tp1_time": tp1_time if tp1_executed else None,
-            "tp1_exit_reason": tp1_exit_reason,
-        }

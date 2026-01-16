@@ -35,6 +35,7 @@ class Trade:
         self.exit_time = None
         self.exit_price = None
         self.exit_reason = None
+        self.exit_level_tag = None
 
         self.tp1_executed = False
         self.tp1_price = None
@@ -107,6 +108,7 @@ class Trade:
             "returns": self.returns,
             "entry_tag": self.entry_tag,
             "exit_tag": self.exit_reason,
+            "exit_level_tag": self.exit_level_tag,
             "tp1_price": self.tp1_price,
             "tp1_time": self.tp1_time,
             "tp1_pnl": getattr(self, "tp1_pnl", 0.0),
