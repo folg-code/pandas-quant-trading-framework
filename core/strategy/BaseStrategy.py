@@ -4,7 +4,7 @@ import inspect
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 
 import pandas as pd
 
@@ -12,34 +12,37 @@ import config
 from config import TIMEFRAME_MAP
 from core.backtesting.plotting.zones import ZoneView
 from core.live_trading.utils import parse_lookback
+from core.strategy.exception import StrategyConfigError
+
 
 # ==================================================
 # Strategy → Engine contract
 # ==================================================
 
 @dataclass(frozen=True)
-class TradePlan:
-    """
-    Immutable trade intent produced by a strategy.
-    """
+class FixedExitPlan:
+    sl: float
+    tp1: float
+    tp2: float
 
+
+@dataclass(frozen=True)
+class ManagedExitPlan:
+    sl: float
+    tp1: Optional[float]
+
+@dataclass(frozen=True)
+class TradePlan:
     symbol: str
     direction: Literal["long", "short"]
 
     entry_price: float
-    sl: float
+    volume: float
+    entry_tag: str
 
-    tp1: Optional[float] = None
-    tp2: Optional[float] = None
+    exit_plan: Union[FixedExitPlan, ManagedExitPlan]
 
-    volume: float = 0.0
-    entry_tag: str = ""
-
-    # who controls exits after entry
-    exit_mode: Literal["fixed", "managed"] = "fixed"
-
-    # 🔑 STRATEGY METADATA
-    strategy_name: str = ""
+    strategy_name: str
     strategy_config: dict = field(default_factory=dict)
 
 
@@ -55,9 +58,38 @@ class TradeAction:
 
 
 class BaseStrategy:
+    """
+    Strategy output contract (per candle):
+
+    signal_entry: dict | None
+        { "direction": "long|short", "tag": str }
+
+    levels: dict | None
+        {
+            "SL":  {"level": float, "tag": str},
+            "TP1": {"level": float, "tag": str},
+            "TP2": {"level": float, "tag": str} | None
+        }
+
+    signal_exit: dict | None
+        {
+            "direction": "close",
+            "exit_tag": str,
+            "entry_tag_to_close": str
+        }
+
+    custom_stop_loss: dict | None
+        {
+            "level": float,
+            "reason": str
+        }
+    """
     REQUIRED_COLUMNS = [
-        "time", "open", "high", "low", "close","atr",
-        "signal_entry", "signal_exit","levels"
+        "time", "open", "high", "low", "close", "atr",
+        "signal_entry",
+        "signal_exit",
+        "levels",
+        "custom_stop_loss",
     ]
 
     def __init__(
@@ -83,13 +115,87 @@ class BaseStrategy:
         self.htf_zones = None  # DataFrame stref HTF
         self.ltf_zones = None  # opcjonalnie, jeśli kiedyś zechcesz
         self.strategy_config = strategy_config or {}
+        self.validate_strategy_config()
 
-    def generate_trade_plan(self, *, row: pd.Series) -> TradePlan | None:
-        """
-        Called on candle close.
-        Must return TradePlan or None.
-        """
-        return None
+    def validate_strategy_config(self):
+        cfg = self.strategy_config
+
+        use_trailing = cfg.get("USE_TRAILING", False)
+        use_tp1 = cfg.get("USE_TP1", True)
+        use_tp2 = cfg.get("USE_TP2", False)
+        trail_from = cfg.get("TRAIL_FROM", "tp1")
+
+        if use_trailing:
+            if trail_from == "tp1" and not use_tp1:
+                raise StrategyConfigError(
+                    "TRAIL_FROM='tp1' requires USE_TP1=True"
+                )
+
+            if use_tp2 and not cfg.get("ALLOW_TP2_WITH_TRAILING", False):
+                raise StrategyConfigError(
+                    "TP2 cannot be used with trailing unless ALLOW_TP2_WITH_TRAILING=True"
+                )
+
+        if cfg.get("TRAIL_MODE") == "swing":
+            if not cfg.get("SWING_LOOKBACK"):
+                raise StrategyConfigError(
+                    "SWING_LOOKBACK required for TRAIL_MODE='swing'"
+                )
+
+
+    def build_trade_plan(self, *, row: pd.Series) -> TradePlan | None:
+        signal = row.get("signal_entry")
+        levels = row.get("levels")
+
+        if not isinstance(signal, dict):
+            return None
+        if not isinstance(levels, dict):
+            return None
+
+        direction = signal.get("direction")
+        if direction not in ("long", "short"):
+            return None
+
+        sl = levels.get("SL", {}).get("level")
+        tp1 = levels.get("TP1", {}).get("level")
+        tp2 = levels.get("TP2", {}).get("level") if levels.get("TP2") else None
+
+        if sl is None:
+            return None
+
+        cfg = self.strategy_config
+        use_trailing = cfg.get("USE_TRAILING", False)
+
+        # -------- decide exit plan --------
+        has_signal_exit = isinstance(row.get("signal_exit"), dict)
+        has_custom_sl = isinstance(row.get("custom_stop_loss"), dict)
+        is_managed = use_trailing or has_signal_exit or has_custom_sl
+
+        if is_managed:
+            exit_plan = ManagedExitPlan(
+                sl=sl,
+                tp1=tp1,
+            )
+        else:
+            if tp1 is None or tp2 is None:
+                return None # Fixed exit requires full SL/TP1/TP2 definition
+
+            exit_plan = FixedExitPlan(
+                sl=sl,
+                tp1=tp1,
+                tp2=tp2,
+            )
+
+        return TradePlan(
+            symbol=self.symbol,
+            direction=direction,
+            entry_price=row["close"],
+            volume=cfg.get("VOLUME", 0.0),
+            entry_tag=signal.get("tag", ""),
+            exit_plan=exit_plan,
+            strategy_name=type(self).__name__,
+            strategy_config=self.strategy_config,
+        )
 
     def manage_trade(
             self,
