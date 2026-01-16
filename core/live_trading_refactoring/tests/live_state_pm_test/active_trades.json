@@ -1,0 +1,16 @@
+{
+  "LIVE_EURUSD_30cd2ae7": {
+    "trade_id": "LIVE_EURUSD_30cd2ae7",
+    "symbol": "EURUSD",
+    "direction": "long",
+    "entry_price": 1.1,
+    "volume": 0.1,
+    "sl": 1.095,
+    "tp1": 1.102,
+    "tp2": 1.105,
+    "tp1_executed": false,
+    "entry_time": "2026-01-16 18:46:41.557404",
+    "entry_tag": "pm_test_entry",
+    "ticket": "MOCK_EURUSD"
+  }
+}

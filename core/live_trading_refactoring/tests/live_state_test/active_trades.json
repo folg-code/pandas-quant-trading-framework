@@ -1,0 +1,16 @@
+{
+  "TEST_1": {
+    "trade_id": "TEST_1",
+    "symbol": "EURUSD",
+    "direction": "long",
+    "entry_price": 1.1,
+    "volume": 0.1,
+    "sl": 1.095,
+    "tp1": 1.102,
+    "tp2": 1.105,
+    "tp1_executed": false,
+    "entry_time": "2026-01-16 18:39:51.797509",
+    "entry_tag": "manual_test_entry",
+    "ticket": null
+  }
+}

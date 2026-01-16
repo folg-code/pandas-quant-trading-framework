@@ -58,6 +58,16 @@ class TradeRepo:
             # corrupted file = fail fast
             raise RuntimeError(f"Corrupted repo file: {path}")
 
+    def _load(self, path: str) -> dict:
+        if not os.path.exists(path):
+            return {}
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _save(self, path: str, data: dict) -> None:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, default=str)
+
     # ==================================================
     # Public API
     # ==================================================
@@ -78,9 +88,41 @@ class TradeRepo:
         """
         return self._load_json(self.closed_path)
 
+
+
     # ==================================================
     # Recording actions
     # ==================================================
+
+    def record_entry_from_plan(
+            self,
+            *,
+            plan,
+            exec_result: dict,
+            entry_time,
+    ):
+        trade_id = exec_result["ticket"]
+
+        trade = {
+            "trade_id": trade_id,
+            "symbol": plan.symbol,
+            "direction": plan.direction,
+            "entry_price": plan.entry_price,
+            "volume": plan.volume,
+            "sl": plan.exit_plan.sl,
+            "tp1": getattr(plan.exit_plan, "tp1", None),
+            "tp2": getattr(plan.exit_plan, "tp2", None),
+            "tp1_executed": False,
+            "entry_time": entry_time.isoformat(),
+            "entry_tag": plan.entry_tag,
+            "strategy": plan.strategy_name,
+            "strategy_config": plan.strategy_config,
+            "ticket": trade_id,
+        }
+
+        active = self.load_active()
+        active[trade_id] = trade
+        self.save_active(active)
 
     def record_entry(
             self,
@@ -112,7 +154,7 @@ class TradeRepo:
             "tp1": tp1,
             "tp2": tp2,
             "tp1_executed": False,
-            "entry_time": entry_time,
+            "entry_time": entry_time.isoformat(),
             "entry_tag": entry_tag,
             "ticket": ticket,
         }
@@ -152,17 +194,14 @@ class TradeRepo:
         self._atomic_write(self.closed_path, closed)
 
     def mark_tp1_executed(
-        self,
-        *,
-        trade_id: str,
-        tp1_price: float,
-        tp1_time: datetime,
+            self,
+            *,
+            trade_id: str,
+            tp1_price: float,
+            tp1_time: datetime,
+            remaining_volume: float,
     ) -> None:
-        """
-        Update TP1 state for active trade.
-        """
         active = self.load_active()
-
         trade = active.get(trade_id)
         if not trade:
             return
@@ -170,5 +209,6 @@ class TradeRepo:
         trade["tp1_executed"] = True
         trade["tp1_price"] = tp1_price
         trade["tp1_time"] = tp1_time
+        trade["volume"] = remaining_volume
 
         self.save_active(active)

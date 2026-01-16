@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Callable, Dict, Any, Iterable
 
 from core.live_trading_refactoring.position_manager import PositionManager
+from core.strategy.BaseStrategy import TradePlan
 
 
 class LiveEngine:
@@ -16,12 +17,12 @@ class LiveEngine:
         *,
         position_manager: PositionManager,
         market_data_provider: Callable[[], Dict[str, Any]],
-        signal_provider: Callable[[], Iterable[Any]],
+        tradeplan_provider: Callable[[], TradePlan | None],
         tick_interval_sec: float = 1.0,
     ):
         self.position_manager = position_manager
         self.market_data_provider = market_data_provider
-        self.signal_provider = signal_provider
+        self.tradeplan_provider = tradeplan_provider
         self.tick_interval_sec = tick_interval_sec
 
         self._running = False
@@ -53,24 +54,19 @@ class LiveEngine:
             time.sleep(self.tick_interval_sec)
 
     def _tick(self):
-        """
-        Single engine tick.
-        """
-
-        # 1️⃣ Market state (price, time, etc.)
         market_state = self.market_data_provider()
         if market_state is None:
             return
 
         market_state.setdefault("time", datetime.utcnow())
 
-        # 2️⃣ Exit logic (every tick)
+        # exits
         self.position_manager.on_tick(market_state=market_state)
 
-        # 3️⃣ Entry logic
-        signals = self.signal_provider() or []
-        for signal in signals:
-            self.position_manager.on_entry_signal(
-                signal=signal,
+        # entry
+        plan = self.tradeplan_provider()
+        if plan is not None:
+            self.position_manager.on_trade_plan(
+                plan=plan,
                 market_state=market_state,
             )

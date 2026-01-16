@@ -168,81 +168,40 @@ class MT5Adapter:
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             raise RuntimeError(f"MT5 close failed: {result}")
 
-    def close_partial(
-        self,
-        *,
-        ticket: str,
-        volume: float,
-        price: float | None = None,
-    ) -> None:
-
+    def close_partial(self, *, ticket: str, volume: float, price: float):
         if self.dry_run:
-            print(f"[DRY-RUN] PARTIAL CLOSE ticket={ticket} vol={volume}")
+            print(f"[DRY-RUN] PARTIAL CLOSE ticket={ticket} vol={volume} price={price}")
             return
-
-        positions = mt5.positions_get(ticket=int(ticket))
-        if not positions:
-            raise RuntimeError(f"No open position with ticket {ticket}")
-
-        pos = positions[0]
-
-        if volume >= pos.volume:
-            raise ValueError("Partial close volume >= position volume")
-
-        order_type = (
-            mt5.ORDER_TYPE_SELL
-            if pos.type == mt5.POSITION_TYPE_BUY
-            else mt5.ORDER_TYPE_BUY
-        )
 
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
-            "position": pos.ticket,
-            "symbol": pos.symbol,
+            "position": ticket,
             "volume": volume,
-            "type": order_type,
-            "price": mt5.symbol_info_tick(pos.symbol).bid
-            if order_type == mt5.ORDER_TYPE_SELL
-            else mt5.symbol_info_tick(pos.symbol).ask,
+            "price": price,
+            "type": mt5.ORDER_TYPE_SELL,  # dla long
             "deviation": 10,
-            "magic": 100001,
-            "comment": "live_engine_tp1",
+            "comment": "tp1_partial",
         }
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            raise RuntimeError(f"MT5 partial close failed: {result}")
+            raise RuntimeError(f"Partial close failed: {result}")
 
-    def modify_sl(
-        self,
-        *,
-        ticket: str,
-        new_sl: float,
-    ) -> None:
-
+    def modify_sl(self, *, ticket: str, new_sl: float):
         if self.dry_run:
-            print(f"[DRY-RUN] MODIFY SL ticket={ticket} new_sl={new_sl}")
+            print(f"[DRY-RUN] MODIFY SL ticket={ticket} sl={new_sl}")
             return
-
-        positions = mt5.positions_get(ticket=int(ticket))
-        if not positions:
-            raise RuntimeError(f"No open position with ticket {ticket}")
-
-        pos = positions[0]
 
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
-            "position": pos.ticket,
+            "position": ticket,
             "sl": new_sl,
-            "tp": pos.tp,
-            "symbol": pos.symbol,
-            "magic": 100001,
-            "comment": "live_engine_be",
+            "tp": 0.0,
         }
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            raise RuntimeError(f"MT5 modify SL failed: {result}")
+            raise RuntimeError(f"SL modify failed: {result}")
 
     def shutdown(self):
         if not self.dry_run:

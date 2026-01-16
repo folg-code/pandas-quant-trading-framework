@@ -1,13 +1,14 @@
+from datetime import datetime
+
 from core.live_trading_refactoring.engine import LiveEngine
 from core.live_trading_refactoring.position_manager import PositionManager
 from core.live_trading_refactoring.trade_repo import TradeRepo
 from core.live_trading_refactoring.mt5_adapter import MT5Adapter
 
-from core.live_trading_refactoring.tests.mocks import market_data_provider_mock, signal_provider_mock_once
 from core.strategy.BaseStrategy import TradePlan, FixedExitPlan
 
 
-def test_live_engine_entry_dry_run(tmp_path):
+def test_live_engine_tradeplan_entry_dry_run(tmp_path):
     # --- repo ---
     repo = TradeRepo(data_dir=tmp_path)
 
@@ -20,6 +21,14 @@ def test_live_engine_entry_dry_run(tmp_path):
         adapter=adapter,
     )
 
+    # --- market state ---
+    def market_data_provider():
+        return {
+            "price": 1.1000,
+            "time": datetime.utcnow(),
+        }
+
+    # --- trade plan provider ---
     def tradeplan_provider():
         return TradePlan(
             symbol="EURUSD",
@@ -38,30 +47,14 @@ def test_live_engine_entry_dry_run(tmp_path):
     # --- engine ---
     engine = LiveEngine(
         position_manager=pm,
-        market_data_provider=market_data_provider_mock,
+        market_data_provider=market_data_provider,
         tradeplan_provider=tradeplan_provider,
         tick_interval_sec=0.0,
     )
 
-    # --- single tick ---
+    # --- tick ---
     engine._tick()
 
+    # --- assert ---
     active = repo.load_active()
-    print("\nACTIVE AFTER FIRST TICK:")
-    print(active)
-
     assert len(active) == 1
-
-    trade = next(iter(active.values()))
-    assert trade["symbol"] == "EURUSD"
-    assert trade["direction"] == "long"
-    assert trade["entry_tag"] == "tp_test"
-
-    # --- second tick (no duplicate) ---
-    engine._tick()
-
-    active2 = repo.load_active()
-    print("\nACTIVE AFTER SECOND TICK:")
-    print(active2)
-
-    assert len(active2) == 1

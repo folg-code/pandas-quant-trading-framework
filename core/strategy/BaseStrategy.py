@@ -18,6 +18,8 @@ from core.strategy.exception import StrategyConfigError
 
 
 
+
+
 class BaseStrategy:
     """
     Strategy output contract (per candle):
@@ -214,6 +216,10 @@ class BaseStrategy:
 
 
     def _populate_informatives(self):
+
+        if self.provider is None:
+            return
+
         for tf, methods in self.informatives.items():
 
             lb_str = config.LOOKBACK_CONFIG.get(tf, "7d")  # default 7 dni
