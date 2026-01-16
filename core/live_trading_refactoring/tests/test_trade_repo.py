@@ -3,7 +3,7 @@ from datetime import datetime
 import sys
 import os
 
-sys.path.append(os.path.abspath("."))
+sys.path.append(os.path.abspath(".."))
 
 from core.live_trading_refactoring.trade_repo import TradeRepo
 import time
