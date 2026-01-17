@@ -4,3 +4,7 @@ class InvalidDataRequest(Exception):
 
 class DataNotAvailable(Exception):
     pass
+
+
+class DataProviderError:
+    pass
