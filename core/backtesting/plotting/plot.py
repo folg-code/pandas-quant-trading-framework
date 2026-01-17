@@ -40,11 +40,14 @@ class TradePlotter:
             "manual_exit": False,
         }
 
+
+
     # -------------------------------------------------
     # PUBLIC API
     # -------------------------------------------------
     def plot(self):
         self._add_candles()
+        self._add_pivots()
         self._add_trades()
         self._add_zones()
         self._add_extra_series()
@@ -69,6 +72,57 @@ class TradePlotter:
     # -------------------------------------------------
     # INTERNALS
     # -------------------------------------------------
+    def _add_pivots(self):
+        pivot_sources = [
+            ('pivot', {
+                3: {'color': 'red', 'label': 'HH'},
+                4: {'color': 'green', 'label': 'LL'},
+                5: {'color': 'red', 'label': 'LH'},
+                6: {'color': 'green', 'label': 'HL'},
+            })
+        ]
+
+        df = self.df.reset_index(drop=True)
+
+        for pivot_col, pivot_map in pivot_sources:
+            if pivot_col not in df.columns:
+                continue
+
+            for i, row in df.iterrows():
+                pivot_val = row.get(pivot_col)
+                if pivot_val not in pivot_map:
+                    continue
+
+                info = pivot_map[pivot_val]
+                start_idx = max(i - 15, 0)
+                end_idx = min(start_idx + 30, len(df) - 1)
+                x_values = [df['time'].iloc[start_idx], df['time'].iloc[end_idx]]
+
+                y_value = None
+                if pivot_val == 3:
+                    y_value = row.get('HH')
+                elif pivot_val == 4:
+                    y_value = row.get('LL')
+                elif pivot_val == 5:
+                    y_value = row.get('LH')
+                elif pivot_val == 6:
+                    y_value = row.get('HL')
+
+                if pd.isna(y_value):
+                    continue
+
+                self.fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=[y_value, y_value],
+                    mode='lines+text',
+                    line=dict(color=info['color'], width=1.5, dash='dash'),
+                    name=info['label'],
+                    text=[info['label'], None],
+                    textposition='top right',
+                    showlegend=False,
+                    hoverinfo='text'
+                ))
+
     def _add_candles(self):
         self.fig.add_trace(
             go.Candlestick(
@@ -95,6 +149,7 @@ class TradePlotter:
         pnl=None,
         exit_reason=None,
     ):
+
         hover = (
             f"Entry tag: {trade.get('entry_tag')}<br>"
             f"Exit tag: {trade.get('exit_tag')}<br>"
@@ -120,26 +175,28 @@ class TradePlotter:
             col=1,
         )
 
-    def _add_trades(self):
-        for _, t in self.trades.iterrows():
-            # ENTRY
-            self._add_trade_marker(
-                t["entry_time"],
-                t["entry_price"],
-                t,
-                "Entry",
-                "black",
-                "circle",
-                showlegend=not self._legend_flags["Entry"],
+    def _connect(self, t0, p0, t1, p1):
+        if pd.notna(t0) and pd.notna(t1) and pd.notna(p0) and pd.notna(p1):
+            self.fig.add_trace(
+                go.Scatter(
+                    x=[t0, t1],
+                    y=[p0, p1],
+                    mode="lines",
+                    line=dict(color="gray", dash="dot"),
+                    showlegend=False,
+                ),
+                row=1,
+                col=1,
             )
-            self._legend_flags["Entry"] = True
 
-            # TP1
-            if pd.notna(t.get("tp1_time")):
+    def _add_trades(self):
+
+        def connect(t0, p0, t1, p1):
+            if pd.notna(t0) and pd.notna(t1) and pd.notna(p0) and pd.notna(p1):
                 self.fig.add_trace(
                     go.Scatter(
-                        x=[t["entry_time"], t["tp1_time"]],
-                        y=[t["entry_price"], t["tp1_price"]],
+                        x=[t0, t1],
+                        y=[p0, p1],
                         mode="lines",
                         line=dict(color="gray", dash="dot"),
                         showlegend=False,
@@ -148,21 +205,52 @@ class TradePlotter:
                     col=1,
                 )
 
+        for _, t in self.trades.iterrows():
+
+            # =========================
+            # ENTRY
+            # =========================
+            self._add_trade_marker(
+                x=t["entry_time"],
+                y=t["entry_price"],
+                trade=t,
+                marker_type="Entry",
+                color="black",
+                symbol="circle",
+                showlegend=not self._legend_flags["Entry"],
+            )
+            self._legend_flags["Entry"] = True
+
+            # =========================
+            # TP1 (jeśli istnieje)
+            # =========================
+            has_tp1 = pd.notna(t.get("tp1_time")) and pd.notna(t.get("tp1_price"))
+
+            if has_tp1:
+                # ENTRY -> TP1
+                connect(
+                    t["entry_time"], t["entry_price"],
+                    t["tp1_time"], t["tp1_price"]
+                )
+
                 self._add_trade_marker(
-                    t["tp1_time"],
-                    t["tp1_price"],
-                    t,
-                    "TP1",
-                    "blue",
-                    "square",
+                    x=t["tp1_time"],
+                    y=t["tp1_price"],
+                    trade=t,
+                    marker_type="TP1",
+                    color="blue",
+                    symbol="square",
                     showlegend=not self._legend_flags["TP1"],
-                    pnl=t["tp1_pnl"],
+                    pnl=t.get("tp1_pnl"),
                     exit_reason=t.get("tp1_exit_reason"),
                 )
                 self._legend_flags["TP1"] = True
 
-            # EXIT
-            exit_tag = t.get("exit_tag", "")
+            # =========================
+            # FINAL EXIT (TP2 / SL / BE)
+            # =========================
+            exit_tag = str(t.get("exit_tag", "")).upper()
+
             if "TP" in exit_tag:
                 color, symbol, key = "blue", "triangle-down", "custom_TP"
             elif "SL" in exit_tag:
@@ -170,13 +258,25 @@ class TradePlotter:
             else:
                 color, symbol, key = "gray", "x", "manual_exit"
 
+            # TP1 -> EXIT  OR  ENTRY -> EXIT
+            if has_tp1:
+                connect(
+                    t["tp1_time"], t["tp1_price"],
+                    t["exit_time"], t["exit_price"]
+                )
+            else:
+                connect(
+                    t["entry_time"], t["entry_price"],
+                    t["exit_time"], t["exit_price"]
+                )
+
             self._add_trade_marker(
-                t["exit_time"],
-                t["exit_price"],
-                t,
-                key,
-                color,
-                symbol,
+                x=t["exit_time"],
+                y=t["exit_price"],
+                trade=t,
+                marker_type=key,
+                color=color,
+                symbol=symbol,
                 showlegend=not self._legend_flags[key],
             )
             self._legend_flags[key] = True

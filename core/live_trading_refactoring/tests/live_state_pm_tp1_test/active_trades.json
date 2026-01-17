@@ -1,0 +1,19 @@
+{
+  "TP1_TEST": {
+    "trade_id": "TP1_TEST",
+    "symbol": "EURUSD",
+    "direction": "long",
+    "entry_price": 1.1,
+    "volume": 0.05,
+    "sl": 1.1,
+    "tp1": 1.102,
+    "tp2": 1.105,
+    "tp1_executed": true,
+    "entry_time": "2026-01-16T19:12:51.013301",
+    "entry_tag": "tp1_test",
+    "ticket": "MOCK_EURUSD",
+    "be_moved": true,
+    "tp1_price": 1.106,
+    "tp1_time": "2026-01-16 19:12:51.015300"
+  }
+}

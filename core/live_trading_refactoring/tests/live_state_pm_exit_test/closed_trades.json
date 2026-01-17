@@ -1,0 +1,21 @@
+{
+  "TEST_EXIT": {
+    "trade_id": "TEST_EXIT",
+    "symbol": "EURUSD",
+    "direction": "long",
+    "entry_price": 1.1,
+    "volume": 0.1,
+    "sl": 1.1,
+    "tp1": 1.102,
+    "tp2": 1.105,
+    "tp1_executed": false,
+    "entry_time": "2026-01-16T18:09:57.791613",
+    "entry_tag": "exit_test",
+    "ticket": "MOCK_EURUSD",
+    "be_moved": true,
+    "exit_price": 1.106,
+    "exit_time": "2026-01-16 19:09:57.792613",
+    "exit_reason": "TP2",
+    "exit_level_tag": "TP2_live"
+  }
+}
