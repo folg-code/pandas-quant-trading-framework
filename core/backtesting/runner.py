@@ -2,24 +2,16 @@ import os
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import config
-from config import BACKTEST_MODE
+from core.data_provider.backend_factory import create_backtest_backend
+from core.data_provider.default_provider import DefaultOhlcvDataProvider
+from core.data_provider.cache import MarketDataCache
+from core.data_provider.backends.dukascopy import DukascopyBackend
+from core.data_provider.backends.mt5 import Mt5Backend
+
 from core.backtesting.backtester import Backtester
-from core.backtesting.plotting.plot import TradePlotter
 from core.backtesting.raporter import BacktestReporter
-from core.data.data_provider import DataProvider
-from core.data_backends.factory import create_backend
-from core.strategy.strategy_factory import create_strategy
-
-
-def run_strategy_single(args):
-    symbol, df, provider = args
-    strategy = create_strategy(symbol, df, config, provider)
-    df_bt = strategy.run()
-    df_bt["symbol"] = symbol
-
-    return df_bt, strategy
-
+from core.backtesting.plotting.plot import TradePlotter
+from core.strategy.runner import run_strategy_single
 
 
 class BacktestRunner:
@@ -32,38 +24,34 @@ class BacktestRunner:
         self.trades_df = None
 
     # ==================================================
-    # 1️⃣ LOAD DATA ONCE (FULL RANGE)
+    # 1️⃣ LOAD DATA ONCE (FULL RANGE, MAIN TF)
     # ==================================================
     def load_data(self):
+        backend = create_backtest_backend(self.config.BACKTEST_DATA_BACKEND)
 
-        backend = create_backend(self.config.DATA_BACKEND)
-
-        self.provider = DataProvider(
-            mode="backtest",
+        self.provider = DefaultOhlcvDataProvider(
             backend=backend,
-            cache_enabled=True
+            cache=MarketDataCache(self.config.MARKET_DATA_PATH),
         )
+
+        start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
+        end = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
 
         all_data = {}
 
-        start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
-        end   = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
-
         for symbol in self.config.SYMBOLS:
-            df = self.provider.get_execution_df(
+            df = self.provider.get_ohlcv(
                 symbol=symbol,
                 timeframe=self.config.TIMEFRAME,
                 start=start,
                 end=end,
-                ensure_complete=False  # 🔑 pełny DF, bez walidacji okien
             )
             all_data[symbol] = df
 
-        self.provider.shutdown()
         return all_data
 
     # ==================================================
-    # 2️⃣ RUN STRATEGY ON FULL DF (ONCE)
+    # 2️⃣ RUN STRATEGIES (PARALLEL)
     # ==================================================
     def run_strategies_parallel(self, all_data: dict):
 
@@ -74,7 +62,11 @@ class BacktestRunner:
             futures = [
                 executor.submit(
                     run_strategy_single,
-                    (symbol, df, self.provider)
+                    symbol,
+                    df,
+                    self.provider,
+                    self.config.STRATEGY_CLASS,
+                    self.config.STARTUP_CANDLE_COUNT,
                 )
                 for symbol, df in all_data.items()
             ]
@@ -122,7 +114,7 @@ class BacktestRunner:
         if self.config.BACKTEST_MODE == "single":
 
             start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
-            end   = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
+            end = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
 
             self.trades_df = self._run_backtest_window(
                 start, end, label="FULL"
@@ -201,23 +193,7 @@ class BacktestRunner:
             plotter.save(f"{plots_folder}/{symbol}.png")
 
     # ==================================================
-    # 7️⃣ SAVE TRADES
-    # ==================================================
-    def save_trades(self):
-
-        if not self.config.SAVE_TRADES_CSV:
-            return
-
-        output_folder = "results/trades"
-        os.makedirs(output_folder, exist_ok=True)
-
-        self.trades_df.to_csv(
-            os.path.join(output_folder, "trades_ALL.csv"),
-            index=False,
-        )
-
-    # ==================================================
-    # 8️⃣ MAIN RUN
+    # 7️⃣ MAIN RUN
     # ==================================================
     def run(self):
 
@@ -227,8 +203,8 @@ class BacktestRunner:
         self.run_strategies_parallel(all_data)
         self.run_backtests()
         self.run_report()
-        if BACKTEST_MODE == "single":
+
+        if self.config.BACKTEST_MODE == "single":
             self.plot_results()
-        #self.save_trades()
 
         print("🏁 Backtest finished")

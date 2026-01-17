@@ -28,7 +28,6 @@ INSTRUMENT_META = {
 }
 
 
-
 class Backtester:
     """Backtester dla wielu symboli."""
 
