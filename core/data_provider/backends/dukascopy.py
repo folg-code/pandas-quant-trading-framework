@@ -39,8 +39,8 @@ class DukascopyBackend(MarketDataBackend):
             raise ValueError("start must be earlier than end")
 
         # Dukascopy expects UTC
-        start = pd.Timestamp(start, tz="UTC")
-        end = pd.Timestamp(end, tz="UTC")
+        start = start.tz_convert("UTC") if start.tzinfo else start.tz_localize("UTC")
+        end = end.tz_convert("UTC") if end.tzinfo else end.tz_localize("UTC")
 
         try:
             df = self.client.get_ohlcv(
