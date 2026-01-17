@@ -7,6 +7,7 @@ from core.live_trading.utils import parse_lookback
 
 
 def create_strategy(symbol, df, config, provider):
+
     strategy = load_strategy(
         name=config.strategy,
         df=df,

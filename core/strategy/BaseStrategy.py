@@ -2,6 +2,7 @@ import inspect
 import time
 from collections import defaultdict
 
+from core.data_backends.mt5_provider import MT5Provider
 from core.strategy.trade_plan import TradePlan, FixedExitPlan, ManagedExitPlan, TradeAction
 
 import pandas as pd
@@ -59,10 +60,12 @@ class BaseStrategy:
             provider=None,
             strategy_config=None,
     ):
+
         self.df = df.copy()
         self.symbol = symbol
         self.startup_candle_count = startup_candle_count
         self.provider = provider
+
 
         self.df_plot = None
         self.df_backtest = None
@@ -267,10 +270,12 @@ class BaseStrategy:
         self.df_backtest = self.df[self.REQUIRED_COLUMNS].copy()
 
     def _collect_informatives(self):
-        for _, method in inspect.getmembers(self, predicate=callable):
+        for _, method in inspect.getmembers(type(self), predicate=callable):
             if getattr(method, "_informative", False):
                 tf = method._informative_timeframe
-                self.informatives[tf].append(method)
+                # zbindowana metoda
+                bound_method = getattr(self, method.__name__)
+                self.informatives[tf].append(bound_method)
 
     def _zones_view(self):
         return ZoneView(self.htf_zones)

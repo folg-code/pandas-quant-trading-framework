@@ -5,7 +5,6 @@ from typing import Optional
 
 from core.strategy.BaseStrategy import BaseStrategy, TradePlan
 
-print(">>> LOADED strategy_adapter FROM", __file__)
 
 class LiveStrategyAdapter:
     """

@@ -42,9 +42,8 @@ class Hts(BaseStrategy):
 
         return df
 
-    def populate_indicators(self):
-
-        df = self.df.copy()
+    def populate_indicators(self) -> None:
+        df = self.df
 
         df['atr'] = ta.ATR(df, 14)
 
@@ -57,10 +56,8 @@ class Hts(BaseStrategy):
         df['sl_long'] = df['close'] - (10 * df['atr'])#df['rma_33_low']
         df['sl_short'] = df['close'] + (10* df['atr']) #df['rma_33_high']
 
-        self.df = df
-
-
-    def populate_entry_trend(self):
+    def populate_entry_trend(self) -> None:
+        df = self.df
         """
         Buduje sygnały wejścia łączące:
         - kierunek sesyjny (sessions_signal)
@@ -68,9 +65,6 @@ class Hts(BaseStrategy):
         - bias rynkowy (session_bias)
         - strefy HTF/LTF (OB, FVG, Breaker)
         """
-        df = self.df.copy()
-
-
 
         # --- 🔹 4. Inicjalizacja sygnałów ---
         df["signal_entry"] = None
@@ -135,10 +129,8 @@ class Hts(BaseStrategy):
               "ATR", (df['atr'].iloc[-1] * 2),)
 
         print("ŻYJĘ")
-        self.df = df
 
 
-        return df
 
     def populate_exit_trend(self):
 

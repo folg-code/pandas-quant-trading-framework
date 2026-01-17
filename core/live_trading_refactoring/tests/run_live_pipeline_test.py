@@ -6,12 +6,11 @@ import time
 import MetaTrader5 as mt5
 import pandas as pd
 
+from core.data_backends.mt5_provider import MT5Provider
 from core.live_trading_refactoring import strategy_adapter
 from core.live_trading_refactoring.engine import LiveEngine
 from core.live_trading_refactoring.strategy_adapter import LiveStrategyAdapter
 
-print(">>> LiveStrategyAdapter =", LiveStrategyAdapter)
-print(">>> methods =", dir(LiveStrategyAdapter))
 
 # === CONFIG ==================================================
 
@@ -106,13 +105,14 @@ def main():
     state = fetch_market_state(SYMBOL, TIMEFRAME, BARS)
     df = state["df"]
 
+    provider = MT5Provider()
     # --- load strategy ---
     strategy = load_strategy(
         name=STRATEGY_NAME,
         df=df,
         symbol=SYMBOL,
         startup_candle_count=200,
-        provider=None,  # MT5 already used here
+        provider=provider,  # MT5 already used here
     )
 
     adapter_strategy = LiveStrategyAdapter(
