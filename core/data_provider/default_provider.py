@@ -4,6 +4,7 @@ import pandas as pd
 from core.data_provider.exceptions import (
     InvalidDataRequest,
 )
+from core.utils.timeframe import timeframe_to_pandas_freq
 
 
 def validate_request(*, start, end, lookback):
@@ -18,14 +19,17 @@ def validate_request(*, start, end, lookback):
         )
 
 
+import pandas as pd
+
+
 class DefaultOhlcvDataProvider:
     """
     BACKTEST OHLCV provider.
 
     Responsibilities:
-    - range-aware cache
-    - fetch only missing data
-    - provide stabilized informative data for strategies
+    - decide if data is missing (TIME-BASED)
+    - fetch ONLY missing ranges
+    - write to cache ONLY when something was fetched
     """
 
     def __init__(
@@ -50,6 +54,27 @@ class DefaultOhlcvDataProvider:
         ts = pd.Timestamp(ts)
         return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
+    @staticmethod
+    def _validate(df: pd.DataFrame) -> pd.DataFrame:
+        BASE_ORDER = ["time", "open", "high", "low", "close", "volume"]
+
+        missing = set(BASE_ORDER) - set(df.columns)
+        if missing:
+            raise ValueError(f"OHLCV missing columns: {missing}")
+
+        df = df.copy()
+        df["time"] = pd.to_datetime(df["time"], utc=True)
+
+        df = (
+            df.sort_values("time")
+              .drop_duplicates(subset="time", keep="last")
+              .reset_index(drop=True)
+        )
+
+        base = [c for c in BASE_ORDER if c in df.columns]
+        rest = [c for c in df.columns if c not in base]
+        return df[base + rest]
+
     # -------------------------------------------------
     # Main API
     # -------------------------------------------------
@@ -66,16 +91,16 @@ class DefaultOhlcvDataProvider:
         start = self._to_utc(start)
         end = self._to_utc(end)
 
-        pieces: list[pd.DataFrame] = []
-
         coverage = self.cache.coverage(
             symbol=symbol,
             timeframe=timeframe,
         )
 
-        # ---------------------------------------------
-        # No cache at all
-        # ---------------------------------------------
+        pieces: list[pd.DataFrame] = []
+
+        # =================================================
+        # 1️⃣ NO CACHE AT ALL
+        # =================================================
         if coverage is None:
             df = self.backend.fetch_ohlcv(
                 symbol=symbol,
@@ -84,36 +109,37 @@ class DefaultOhlcvDataProvider:
                 end=end,
             )
             df = self._validate(df)
-            self.cache.save(
-                symbol=symbol,
-                timeframe=timeframe,
-                df=df,
-            )
+            self.cache.save(symbol=symbol, timeframe=timeframe, df=df)
             return df
 
         cov_start, cov_end = coverage
 
-        # ---------------------------------------------
-        # Missing BEFORE
-        # ---------------------------------------------
-        if start < cov_start:
+        # =================================================
+        # 2️⃣ MISSING BEFORE (FIXED)
+        # =================================================
+
+        freq = timeframe_to_pandas_freq(timeframe)
+        first_required_bar = start.floor(freq)
+
+        if first_required_bar < cov_start:
             df_pre = self.backend.fetch_ohlcv(
                 symbol=symbol,
                 timeframe=timeframe,
-                start=start,
+                start=first_required_bar,
                 end=cov_start,
             )
             df_pre = self._validate(df_pre)
-            self.cache.append(
-                symbol=symbol,
-                timeframe=timeframe,
-                df=df_pre,
-            )
-            pieces.append(df_pre)
+            if not df_pre.empty:
+                self.cache.append(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    df=df_pre,
+                )
+                pieces.append(df_pre)
 
-        # ---------------------------------------------
-        # Cached middle
-        # ---------------------------------------------
+        # =================================================
+        # 3️⃣ CACHED MIDDLE
+        # =================================================
         df_mid = self.cache.load_range(
             symbol=symbol,
             timeframe=timeframe,
@@ -122,26 +148,38 @@ class DefaultOhlcvDataProvider:
         )
         pieces.append(df_mid)
 
-        # ---------------------------------------------
-        # Missing AFTER
-        # ---------------------------------------------
-        if end > cov_end:
+        # =================================================
+        # 4️⃣ MISSING AFTER (FIXED)
+        # =================================================
+
+        freq = timeframe_to_pandas_freq(timeframe)
+        last_required_bar = end.floor(freq)
+
+        if last_required_bar > cov_end:
             df_post = self.backend.fetch_ohlcv(
                 symbol=symbol,
                 timeframe=timeframe,
                 start=cov_end,
-                end=end,
+                end=last_required_bar,
             )
             df_post = self._validate(df_post)
-            self.cache.append(
-                symbol=symbol,
-                timeframe=timeframe,
-                df=df_post,
-            )
-            pieces.append(df_post)
+            if not df_post.empty:
+                self.cache.append(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    df=df_post,
+                )
+                pieces.append(df_post)
 
+        # =================================================
+        # 5️⃣ FINAL MERGE
+        # =================================================
         df = pd.concat(pieces, ignore_index=True)
         return self._validate(df)
+
+    # -------------------------------------------------
+    # Informative data
+    # -------------------------------------------------
 
     def get_informative_df(
         self,
@@ -150,10 +188,6 @@ class DefaultOhlcvDataProvider:
         timeframe: str,
         startup_candle_count: int,
     ) -> pd.DataFrame:
-        """
-        Informative data for BACKTEST.
-        Uses full backtest range and trims to stabilize indicators.
-        """
 
         df = self.get_ohlcv(
             symbol=symbol,
@@ -163,33 +197,3 @@ class DefaultOhlcvDataProvider:
         )
 
         return df.tail(startup_candle_count).copy()
-
-    # -------------------------------------------------
-    # Validation
-    # -------------------------------------------------
-
-    @staticmethod
-    def _validate(df: pd.DataFrame) -> pd.DataFrame:
-        BASE_ORDER = ["time", "open", "high", "low", "close", "volume"]
-
-        missing = set(BASE_ORDER) - set(df.columns)
-        if missing:
-            raise ValueError(f"OHLCV missing columns: {missing}")
-
-        df = df.copy()
-
-        # --- normalize time ---
-        df["time"] = pd.to_datetime(df["time"], utc=True)
-
-        # --- sort & deduplicate ---
-        df = (
-            df.sort_values("time")
-            .drop_duplicates(subset="time", keep="last")
-            .reset_index(drop=True)
-        )
-
-        # --- enforce column order ---
-        base = [c for c in BASE_ORDER if c in df.columns]
-        rest = [c for c in df.columns if c not in base]
-
-        return df[base + rest]

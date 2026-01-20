@@ -8,6 +8,10 @@ class MarketDataCache:
     """
     CSV-based OHLCV cache.
     One file per (symbol, timeframe).
+
+    Cache is PASSIVE:
+    - does NOT decide whether data is missing
+    - writes ONLY when provider explicitly asks
     """
 
     def __init__(self, root: Path):
@@ -19,8 +23,7 @@ class MarketDataCache:
     # -------------------------------------------------
 
     def _path(self, symbol: str, timeframe: str) -> Path:
-        fname = f"{symbol}_{timeframe}.csv"
-        return self.root / fname
+        return self.root / f"{symbol}_{timeframe}.csv"
 
     # -------------------------------------------------
     # Coverage
@@ -32,11 +35,7 @@ class MarketDataCache:
         symbol: str,
         timeframe: str,
     ) -> tuple[pd.Timestamp, pd.Timestamp] | None:
-
-
         path = self._path(symbol, timeframe)
-
-        print("CACHE CHECK:", symbol, timeframe, path.exists())
         if not path.exists():
             return None
 
@@ -83,17 +82,26 @@ class MarketDataCache:
         timeframe: str,
         df: pd.DataFrame,
     ) -> None:
+        if df.empty:
+            return
+
         path = self._path(symbol, timeframe)
-        df = df.sort_values("time").reset_index(drop=True)
-        df.to_csv(path, index=False)
+        (
+            df.sort_values("time")
+              .reset_index(drop=True)
+              .to_csv(path, index=False)
+        )
 
     def append(
-        self,
-        *,
-        symbol: str,
-        timeframe: str,
-        df: pd.DataFrame,
+            self,
+            *,
+            symbol: str,
+            timeframe: str,
+            df: pd.DataFrame,
     ) -> None:
+        if df.empty:
+            return
+
         path = self._path(symbol, timeframe)
 
         if not path.exists():
@@ -101,13 +109,19 @@ class MarketDataCache:
             return
 
         existing = pd.read_csv(path)
-        combined = pd.concat([existing, df], ignore_index=True)
 
+        before = len(existing)
+
+        combined = pd.concat([existing, df], ignore_index=True)
         combined["time"] = pd.to_datetime(combined["time"], utc=True)
         combined = (
             combined.sort_values("time")
             .drop_duplicates(subset="time", keep="last")
             .reset_index(drop=True)
         )
+
+        # 🔒 KLUCZOWY GUARD
+        if len(combined) == before:
+            return
 
         combined.to_csv(path, index=False)
