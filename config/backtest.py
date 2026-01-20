@@ -38,7 +38,7 @@ TIMEFRAME = "M1"
 # ==================================================
 
 INITIAL_BALANCE = 10_000
-SLIPPAGE = 0.0001
+SLIPPAGE = 0.1 # PIPS
 MAX_RISK_PER_TRADE = 0.005
 
 SAVE_TRADES_CSV = False
