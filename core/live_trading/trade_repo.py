@@ -1,4 +1,3 @@
-# live_trading/trade_repo.py
 
 import json
 import os

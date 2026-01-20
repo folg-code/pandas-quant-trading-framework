@@ -7,8 +7,8 @@ import pandas as pd
 
 from config.live import STARTUP_CANDLE_COUNT
 from core.data_provider.clients.mt5_provider import lookback_to_bars, LiveMT5Provider
-from core.live_trading_refactoring.engine import LiveEngine
-from core.live_trading_refactoring.strategy_adapter import LiveStrategyAdapter
+from core.live_trading.engine import LiveEngine
+from core.live_trading.strategy_adapter import LiveStrategyAdapter
 from core.utils.lookback import LOOKBACK_CONFIG
 from core.utils.timeframe import MT5_TIMEFRAME_MAP
 
@@ -41,9 +41,9 @@ MIN_HTF_BARS = {
 
 from core.strategy.strategy_loader import load_strategy, load_strategy_class
 
-from core.live_trading_refactoring.position_manager import PositionManager
-from core.live_trading_refactoring.mt5_adapter import MT5Adapter
-from core.live_trading_refactoring.trade_repo import TradeRepo
+from core.live_trading.position_manager import PositionManager
+from core.live_trading.mt5_adapter import MT5Adapter
+from core.live_trading.trade_repo import TradeRepo
 
 # ============================================================
 # MT5 INIT

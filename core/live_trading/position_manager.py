@@ -1,4 +1,3 @@
-# core/live_trading_refactoring/position_manager.py
 
 import uuid
 from datetime import datetime
@@ -8,10 +7,9 @@ import mt5
 
 from config.live import MAX_RISK_PER_TRADE
 from core.domain.risk import position_sizer_fast
-from core.live_trading_refactoring.trade_repo import TradeRepo
-from core.live_trading_refactoring.mt5_adapter import MT5Adapter
+from core.live_trading.trade_repo import TradeRepo
+from core.live_trading.mt5_adapter import MT5Adapter
 
-from core.domain.execution import map_exit_code_to_reason, EXIT_SL, EXIT_TP2, EXIT_EOD
 from core.domain.trade_exit import TradeExitResult, TradeExitReason
 from datetime import timedelta
 

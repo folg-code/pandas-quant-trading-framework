@@ -1,4 +1,3 @@
-# core/live_trading/strategy_adapter.py
 
 import pandas as pd
 from typing import Optional

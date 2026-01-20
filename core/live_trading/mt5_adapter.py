@@ -1,7 +1,5 @@
-# core/live_trading_refactoring/mt5_adapter.py
-
 from typing import Dict, Any
-from datetime import datetime
+
 import MetaTrader5 as mt5
 
 

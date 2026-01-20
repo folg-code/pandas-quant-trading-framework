@@ -1,10 +1,10 @@
 import time
-from datetime import datetime
-from typing import Callable, Dict, Any, Iterable
 
-from core.live_trading_refactoring.position_manager import PositionManager
-from core.live_trading_refactoring.strategy_adapter import LiveStrategyAdapter
-from core.strategy.trade_plan  import TradePlan
+from datetime import datetime
+
+from core.live_trading.position_manager import PositionManager
+from core.live_trading.strategy_adapter import LiveStrategyAdapter
+
 
 
 class LiveEngine:
