@@ -206,6 +206,7 @@ class BaseStrategy:
             df_tf = self.provider.get_informative_df(
                 symbol=self.symbol,
                 timeframe=tf,
+                startup_candle_count=self.startup_candle_count,
             )
 
             for method in methods:

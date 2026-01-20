@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+
 from core.data_provider.backend_factory import create_backtest_backend
 from core.data_provider.default_provider import DefaultOhlcvDataProvider
 from core.data_provider.cache import MarketDataCache
@@ -12,6 +13,7 @@ from core.backtesting.backtester import Backtester
 from core.backtesting.raporter import BacktestReporter
 from core.backtesting.plotting.plot import TradePlotter
 from core.strategy.runner import run_strategy_single
+from core.strategy.strategy_loader import load_strategy_class
 
 
 class BacktestRunner:
@@ -29,13 +31,16 @@ class BacktestRunner:
     def load_data(self):
         backend = create_backtest_backend(self.config.BACKTEST_DATA_BACKEND)
 
+        start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
+        end = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
+
+
         self.provider = DefaultOhlcvDataProvider(
             backend=backend,
             cache=MarketDataCache(self.config.MARKET_DATA_PATH),
+            backtest_start=start,
+            backtest_end=end,
         )
-
-        start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
-        end = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
 
         all_data = {}
 
@@ -65,7 +70,7 @@ class BacktestRunner:
                     symbol,
                     df,
                     self.provider,
-                    self.config.STRATEGY_CLASS,
+                    load_strategy_class(self.config.STRATEGY_CLASS),
                     self.config.STARTUP_CANDLE_COUNT,
                 )
                 for symbol, df in all_data.items()
@@ -208,3 +213,4 @@ class BacktestRunner:
             self.plot_results()
 
         print("🏁 Backtest finished")
+

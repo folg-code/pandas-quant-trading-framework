@@ -1,2 +1,0 @@
-class MarketDataError:
-    pass

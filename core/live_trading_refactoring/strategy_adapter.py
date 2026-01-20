@@ -40,27 +40,3 @@ class LiveStrategyAdapter:
         last_row = df.iloc[-1]
         return self.strategy.build_trade_plan(row=last_row)
 
-    def get_trade_plan(self) -> Optional[TradePlan]:
-        """
-        Called by live engine.
-        Returns TradePlan only once per closed candle.
-        """
-
-
-
-        # 2️⃣ Dopiero teraz odpal strategię
-        df = self.strategy.run()
-        if df.empty:
-            return None
-
-        last_row = df.iloc[-1]
-        bar_time = last_row["time"]
-
-        self._last_bar_time = bar_time
-
-        # 3️⃣ TradePlan
-        plan = self.strategy.build_trade_plan(row=last_row)
-        if plan is None:
-            return None
-
-        return plan

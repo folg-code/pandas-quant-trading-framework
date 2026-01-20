@@ -1,14 +1,11 @@
 # scripts/run_live_pipeline.py
 
 from datetime import datetime
-import time
 
 import MetaTrader5 as mt5
 import pandas as pd
 
-from core.data_backends.base import lookback_to_bars, LiveMT5Provider
-from core.data_backends.mt5_provider import MT5Provider
-from core.live_trading_refactoring import strategy_adapter
+from core.data_provider.clients.mt5_provider import lookback_to_bars, LiveMT5Provider
 from core.live_trading_refactoring.engine import LiveEngine
 from core.live_trading_refactoring.strategy_adapter import LiveStrategyAdapter
 
@@ -45,9 +42,6 @@ from core.strategy.strategy_loader import load_strategy, load_strategy_class
 from core.live_trading_refactoring.position_manager import PositionManager
 from core.live_trading_refactoring.mt5_adapter import MT5Adapter
 from core.live_trading_refactoring.trade_repo import TradeRepo
-
-from core.strategy.trade_plan import TradePlan
-
 
 # ============================================================
 # MT5 INIT

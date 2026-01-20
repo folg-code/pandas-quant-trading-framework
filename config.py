@@ -34,6 +34,8 @@ TIMERANGE = {
 
 INITIAL_BALACNE = 10_000
 
+RUN_MODE = "backtest" #live
+
 BACKTEST_MODE = "single" # split
 
 BACKTEST_WINDOWS =  {

@@ -1,7 +1,6 @@
 # core/live_trading_refactoring/position_manager.py
 
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from typing import Dict, Any
 
@@ -392,7 +391,7 @@ class PositionManager:
                         price=price,
                         now=now,
                     )
-            continue
+                continue
 
             # --- TRAILING / CUSTOM SL ---
             #self._update_trailing_sl(trade_id, trade, market_state)

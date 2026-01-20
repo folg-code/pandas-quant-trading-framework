@@ -44,14 +44,14 @@ class Hts(BaseStrategy):
         df['rma_144_high'] = qtpylib.rma(df, df['high'], 144)
 
 
-        print("df_M30",df)
+        print("df M30", list(df.columns))
 
         return df
 
     def populate_indicators(self) -> None:
         df = self.df
 
-        print("df main", df)
+        print("df main", list(df.columns))
 
         df['atr'] = ta.ATR(df, 14)
 

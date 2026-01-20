@@ -32,7 +32,11 @@ class MarketDataCache:
         symbol: str,
         timeframe: str,
     ) -> tuple[pd.Timestamp, pd.Timestamp] | None:
+
+
         path = self._path(symbol, timeframe)
+
+        print("CACHE CHECK:", symbol, timeframe, path.exists())
         if not path.exists():
             return None
 

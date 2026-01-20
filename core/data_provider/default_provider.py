@@ -1,15 +1,8 @@
 from __future__ import annotations
 
 import pandas as pd
-
-from core.data_provider.provider import (
-    OhlcvDataProvider
-)
-from core.data_provider.backend import MarketDataBackend
-from core.data_provider.cache import MarketDataCache
 from core.data_provider.exceptions import (
     InvalidDataRequest,
-    DataNotAvailable,
 )
 
 
@@ -29,20 +22,24 @@ class DefaultOhlcvDataProvider:
     """
     BACKTEST OHLCV provider.
 
-    Rules:
+    Responsibilities:
     - range-aware cache
-    - backend called ONLY for missing ranges
-    - OHLCV only (no ticks)
+    - fetch only missing data
+    - provide stabilized informative data for strategies
     """
 
     def __init__(
         self,
         *,
-        backend: MarketDataBackend,
-        cache: MarketDataCache,
+        backend,
+        cache,
+        backtest_start: pd.Timestamp,
+        backtest_end: pd.Timestamp,
     ):
         self.backend = backend
         self.cache = cache
+        self.backtest_start = self._to_utc(backtest_start)
+        self.backtest_end = self._to_utc(backtest_end)
 
     # -------------------------------------------------
     # Helpers
@@ -51,9 +48,7 @@ class DefaultOhlcvDataProvider:
     @staticmethod
     def _to_utc(ts: pd.Timestamp) -> pd.Timestamp:
         ts = pd.Timestamp(ts)
-        if ts.tzinfo is None:
-            return ts.tz_localize("UTC")
-        return ts.tz_convert("UTC")
+        return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
     # -------------------------------------------------
     # Main API
@@ -64,17 +59,9 @@ class DefaultOhlcvDataProvider:
         *,
         symbol: str,
         timeframe: str,
-        start: pd.Timestamp | None = None,
-        end: pd.Timestamp | None = None,
-        lookback: pd.Timedelta | None = None,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
     ) -> pd.DataFrame:
-
-        validate_request(start=start, end=end, lookback=lookback)
-
-        if lookback is not None:
-            raise InvalidDataRequest(
-                "Lookback mode not supported in backtest provider."
-            )
 
         start = self._to_utc(start)
         end = self._to_utc(end)
@@ -154,8 +141,28 @@ class DefaultOhlcvDataProvider:
             pieces.append(df_post)
 
         df = pd.concat(pieces, ignore_index=True)
-
         return self._validate(df)
+
+    def get_informative_df(
+        self,
+        *,
+        symbol: str,
+        timeframe: str,
+        startup_candle_count: int,
+    ) -> pd.DataFrame:
+        """
+        Informative data for BACKTEST.
+        Uses full backtest range and trims to stabilize indicators.
+        """
+
+        df = self.get_ohlcv(
+            symbol=symbol,
+            timeframe=timeframe,
+            start=self.backtest_start,
+            end=self.backtest_end,
+        )
+
+        return df.tail(startup_candle_count).copy()
 
     # -------------------------------------------------
     # Validation
@@ -163,16 +170,26 @@ class DefaultOhlcvDataProvider:
 
     @staticmethod
     def _validate(df: pd.DataFrame) -> pd.DataFrame:
-        required = ["time", "open", "high", "low", "close", "volume"]
-        missing = set(required) - set(df.columns)
+        BASE_ORDER = ["time", "open", "high", "low", "close", "volume"]
+
+        missing = set(BASE_ORDER) - set(df.columns)
         if missing:
             raise ValueError(f"OHLCV missing columns: {missing}")
 
         df = df.copy()
+
+        # --- normalize time ---
         df["time"] = pd.to_datetime(df["time"], utc=True)
 
-        return (
+        # --- sort & deduplicate ---
+        df = (
             df.sort_values("time")
             .drop_duplicates(subset="time", keep="last")
             .reset_index(drop=True)
         )
+
+        # --- enforce column order ---
+        base = [c for c in BASE_ORDER if c in df.columns]
+        rest = [c for c in df.columns if c not in base]
+
+        return df[base + rest]
