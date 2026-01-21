@@ -3,42 +3,96 @@ import pandas as pd
 
 
 class FiboCalculator:
-    def apply(self, df: pd.DataFrame) -> pd.DataFrame:
-        return self._detect_fibo(df)
+    def __init__(
+        self,
+        pivot_range: int,
+        mode: str = "swing",  # "swing" | "range"
+        levels: tuple[float, ...] = (0.5, 0.618, 0.66, 1.25, 1.618),
+        prefix: str = "fibo",
+    ):
+        self.pivot_range = pivot_range
+        self.mode = mode
+        self.levels = levels
+        self.prefix = prefix
 
+    def apply(self, df: pd.DataFrame) -> dict[str, pd.Series]:
+        if self.mode == "swing":
+            return self._fibo_swing(df)
+        elif self.mode == "range":
+            return self._fibo_range(df)
+        else:
+            raise ValueError(f"Unknown fibo mode: {self.mode}")
 
-    def _detect_fibo(self, df: pd.DataFrame) -> pd.DataFrame:
-        HH, LL, LH, HL = df[f'HH'], df[f'LL'], df[f'LH'], df[
-            f'HL']
-        HH_idx, LL_idx, LH_idx, HL_idx = (
-            df[f'HH_idx'], df[f'LL_idx'],
-            df[f'LH_idx'], df[f'HL_idx']
-        )
+        # ==========================================================
+        # MODE A: SWING (last HH/LH vs LL/HL)
+        # ==========================================================
 
-        # Lokalne poziomy
-        df[f'last_low'] = np.where(LL_idx > HL_idx, LL, HL)
-        df[f'last_high'] = np.where(HH_idx > LH_idx, HH, LH)
-        rise = df[f'last_high'] - df[f'last_low']
+    def _fibo_swing(self, df: pd.DataFrame) -> dict[str, pd.Series]:
+        idx = df.index
 
-        cond_up = df[f'last_low'] < df[f'last_high']
+        HH = df.get("HH", pd.Series(np.nan, index=idx))
+        LL = df.get("LL", pd.Series(np.nan, index=idx))
+        LH = df.get("LH", pd.Series(np.nan, index=idx))
+        HL = df.get("HL", pd.Series(np.nan, index=idx))
+
+        HH_idx = df.get("HH_idx", pd.Series(np.nan, index=idx))
+        LL_idx = df.get("LL_idx", pd.Series(np.nan, index=idx))
+        LH_idx = df.get("LH_idx", pd.Series(np.nan, index=idx))
+        HL_idx = df.get("HL_idx", pd.Series(np.nan, index=idx))
+
+        # 1️⃣ last_low / last_high (1:1 jak w starym kodzie)
+        last_low = np.where(LL_idx > HL_idx, LL, HL)
+        last_high = np.where(HH_idx > LH_idx, HH, LH)
+
+        last_low = pd.Series(last_low, index=idx)
+        last_high = pd.Series(last_high, index=idx)
+
+        rise = last_high - last_low
+
+        cond_up = last_low < last_high
         cond_down = ~cond_up
-        fib_levels = [0.5, 0.618, 0.66, 1.272, 1.618]
 
-        for coeff in fib_levels:
-            df.loc[cond_up, f'fibo_local_{str(coeff).replace(".", "")}'] = (
-                    df[f'last_high'] - rise * coeff
-            )
-            df.loc[cond_down, f'fibo_local_{str(coeff).replace(".", "")}_bear'] = (
-                    df[f'last_low'] + rise * coeff
-            )
+        out = {}
 
-        df['range_mid'] = np.where(
-            cond_up,
-            df['fibo_local_05'],
-            df['fibo_local_05_bear']
-        )
+        for coeff in self.levels:
+            key = str(coeff).replace(".", "")
 
-        df['in_discount'] = df['low'] < df['range_mid']
-        df['in_premium'] = df['high'] > df['range_mid']
+            bull = last_high - rise * coeff
+            bear = last_low + rise * coeff
 
-        return df
+            out[f"{self.prefix}_{key}"] = bull.where(cond_up)
+            out[f"{self.prefix}_{key}_bear"] = bear.where(cond_down)
+
+        return out
+
+        # ==========================================================
+        # MODE B: RANGE / STRUCTURAL (HH vs LAST VALID LL)
+        # ==========================================================
+
+    def _fibo_range(self, df: pd.DataFrame) -> dict[str, pd.Series]:
+        idx = df.index
+
+        HH = df.get("HH", pd.Series(np.nan, index=idx))
+        LL = df.get("LL", pd.Series(np.nan, index=idx))
+        HH_idx = df.get("HH_idx", pd.Series(np.nan, index=idx))
+        LL_idx = df.get("LL_idx", pd.Series(np.nan, index=idx))
+
+        # 1️⃣ wybór LL: ostatnie LL z indeksem < HH_idx
+        valid_LL = LL.where(LL_idx < HH_idx)
+        base_LL = valid_LL.ffill()
+
+        rise = HH - base_LL
+
+        out = {}
+
+        for coeff in self.levels:
+            key = str(coeff).replace(".", "")
+
+            # retracement
+            out[f"{self.prefix}_{key}"] = HH - rise * coeff
+
+            # extension
+            if coeff > 1:
+                out[f"{self.prefix}_ext_{key}"] = HH + rise * (coeff - 1)
+
+        return out

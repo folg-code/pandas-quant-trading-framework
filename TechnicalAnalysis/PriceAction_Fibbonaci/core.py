@@ -17,17 +17,34 @@ class IntradayMarketStructure:
         self,
         pivot_range: int = 15,
         min_percentage_change: float = 0.01,
-        use_engine: bool = False,   # 👈 KLUCZOWE
+        use_engine: bool = False,
     ):
         self.pivot_range = pivot_range
         self.min_percentage_change = min_percentage_change
         self.use_engine = use_engine
 
-        # 🔹 nowy engine (ale jeszcze opcjonalny)
+        # =========================
+        # FIBO DEFINICJE (JAWNIE)
+        # =========================
+        self.fibo_swing = FiboCalculator(
+            pivot_range=pivot_range,
+            mode="swing",
+            prefix=f"fibo_swing"
+        )
+
+        self.fibo_range = FiboCalculator(
+            pivot_range=pivot_range,
+            mode="range",
+            prefix=f"fibo_range"
+        )
+
+        # =========================
+        # ENGINE
+        # =========================
         self.engine = MarketStructureEngine(
             pivot_detector=PivotDetector(self.pivot_range),
             relations=PivotRelations(),
-            fibo=FiboCalculator(),
+            fibo=None,  # fibo obsłużymy ręcznie (2 tryby)
             price_action=PriceActionStateEngine(),
         )
 
@@ -90,10 +107,20 @@ class IntradayMarketStructure:
         return out
 
     def detect_eqh_eql_from_pivots(self, df):
-        return PivotRelations().apply(df)
+        out = PivotRelations().apply(df)
+        df = df.assign(**out)
+        return df
 
-    def detect_fibo(self, df):
-        return FiboCalculator().apply(df)
+    def detect_fibo(self, df: pd.DataFrame):
+        out = {}
+
+        out.update(self.fibo_swing.apply(df))
+        out.update(self.fibo_range.apply(df))
+
+        df = df.assign(**out)
+
+        print(list(df.columns))
+        return df
 
     def detect_price_action(self, df):
         return PriceActionStateEngine().apply(df)
