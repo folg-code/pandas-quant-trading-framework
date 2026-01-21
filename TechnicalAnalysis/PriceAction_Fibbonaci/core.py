@@ -5,7 +5,9 @@ import pandas as pd
 import talib.abstract as ta
 from debugpy.launcher.debuggee import describe
 
+from TechnicalAnalysis.MarketStructure.fibo import FiboCalculator
 from TechnicalAnalysis.MarketStructure.pivots import PivotDetector
+from TechnicalAnalysis.MarketStructure.relations import PivotRelations
 
 
 class IntradayMarketStructure:
@@ -24,124 +26,14 @@ class IntradayMarketStructure:
         detector = PivotDetector(self.pivot_range)
         return detector.apply(df)
 
-    def detect_eqh_eql_from_pivots(
-            self,
-            df: pd.DataFrame,
-            eq_atr_mult: float = 0.2,
-            prefix: str = ""
-    ) -> pd.DataFrame:
-
-
-
-        # =========================
-        # Threshold
-        # =========================
-        eq_threshold = df['atr'] * eq_atr_mult
-
-        # =========================
-        # EQH: HH–HH
-        # =========================
-        eqh_hh = (
-                (df['HH_idx'].notna()) &
-                (df['HH_idx_shift'].notna()) &
-                (df['HH_idx'] != df['HH_idx_shift']) &
-                ((df['HH'] - df['HH_shift']).abs() <= eq_threshold)
-        )
-
-        # =========================
-        # EQH: HH–LH
-        # =========================
-        eqh_hh_lh = (
-                (df['LH_idx'].notna()) &
-                (df['HH_idx'].notna()) &
-                (df['LH_idx'] > df['HH_idx']) &
-                (df['LH_idx'] != df['LH_idx_shift']) &
-                ((df['LH'] - df['HH']).abs() <= eq_threshold)
-        )
-
-        df[f'{prefix}EQH'] = eqh_hh | eqh_hh_lh
-
-        # EQH level
-        df[f'{prefix}EQH_level'] = np.where(
-            eqh_hh, df['HH'],
-            np.where(eqh_hh_lh, df['HH'], np.nan)
-        )
-        df[f'{prefix}EQH_level'] = df[f'{prefix}EQH_level'].ffill()
-
-        # =========================
-        # EQL: LL–LL
-        # =========================
-        eql_ll = (
-                (df['LL_idx'].notna()) &
-                (df['LL_idx_shift'].notna()) &
-                (df['LL_idx'] != df['LL_idx_shift']) &
-                ((df['LL'] - df['LL_shift']).abs() <= eq_threshold)
-        )
-
-        # =========================
-        # EQL: LL–HL
-        # =========================
-        eql_ll_hl = (
-                (df['HL_idx'].notna()) &
-                (df['LL_idx'].notna()) &
-                (df['HL_idx'] > df['LL_idx']) &
-                (df['HL_idx'] != df['HL_idx_shift']) &
-                ((df['HL'] - df['LL']).abs() <= eq_threshold)
-        )
-
-        df[f'{prefix}EQL'] = eql_ll | eql_ll_hl
-
-        # EQL level
-        df[f'{prefix}EQL_level'] = np.where(
-            eql_ll, df['LL'],
-            np.where(eql_ll_hl, df['LL'], np.nan)
-        )
-        df[f'{prefix}EQL_level'] = df[f'{prefix}EQL_level'].ffill()
-
-
-
-        return df
+    def detect_eqh_eql_from_pivots(self, df):
+        return PivotRelations().apply(df)
 
     # =============================================================
     # 2️⃣ DETEKCJA POZIOMÓW FIBO
     # =============================================================
     def detect_fibo(self, df):
-
-
-        HH, LL, LH, HL = df[f'HH'], df[f'LL'], df[f'LH'], df[
-            f'HL']
-        HH_idx, LL_idx, LH_idx, HL_idx = (
-            df[f'HH_idx'], df[f'LL_idx'],
-            df[f'LH_idx'], df[f'HL_idx']
-        )
-
-        # Lokalne poziomy
-        df[f'last_low'] = np.where(LL_idx > HL_idx, LL, HL)
-        df[f'last_high'] = np.where(HH_idx > LH_idx, HH, LH)
-        rise = df[f'last_high'] - df[f'last_low']
-
-        cond_up = df[f'last_low'] < df[f'last_high']
-        cond_down = ~cond_up
-        fib_levels = [0.5, 0.618, 0.66, 1.272, 1.618]
-
-        for coeff in fib_levels:
-            df.loc[cond_up, f'fibo_local_{str(coeff).replace(".", "")}'] = (
-                    df[f'last_high'] - rise * coeff
-            )
-            df.loc[cond_down, f'fibo_local_{str(coeff).replace(".", "")}_bear'] = (
-                    df[f'last_low'] + rise * coeff
-            )
-
-        df['range_mid'] = np.where(
-            cond_up,
-            df['fibo_local_05'],
-            df['fibo_local_05_bear']
-        )
-
-        df['in_discount'] = df['low'] < df['range_mid']
-        df['in_premium'] = df['high'] > df['range_mid']
-
-        return df
+        return FiboCalculator().apply(df)
 
     # =============================================================
     # 3️⃣ DETEKCJA PRICE ACTION
@@ -302,8 +194,6 @@ class IntradayMarketStructure:
             # ==========================
             df[f'{name}_level'] = df[f'{name}_level'].ffill()
             df[f'{name}_event_idx'] = df[f'{name}_event_idx'].ffill()
-
-
 
 
         return df
