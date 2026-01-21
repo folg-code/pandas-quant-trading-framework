@@ -138,8 +138,11 @@ class IntradayMarketStructure:
         return df
 
     def detect_follow_through(self, df):
-        out = self.pa_follow_through.apply(df)
-        df = df.assign(**out)
+        ft_bos = PriceActionFollowThrough(event_source="bos")
+        df = df.assign(**ft_bos.apply(df))
+
+        ft_mss = PriceActionFollowThrough(event_source="mss")
+        df = df.assign(**ft_mss.apply(df))
 
         print(list(df.columns))
         return df
