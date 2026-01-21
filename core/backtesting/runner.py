@@ -27,6 +27,7 @@ class BacktestRunner:
         self.signals_df = None
         self.trades_df = None
 
+
     # ==================================================
     # 1️⃣ LOAD DATA ONCE (FULL RANGE, MAIN TF)
     # ==================================================
@@ -179,12 +180,18 @@ class BacktestRunner:
         for strategy in self.strategies:
             symbol = strategy.symbol
 
-            trades_symbol = self.trades_df[
-                self.trades_df["symbol"] == symbol
-            ]
+            # ==========================
+            # PLOT-ONLY MODE
+            # ==========================
+            if self.trades_df is None:
+                trades_symbol = None
+            else:
+                trades_symbol = self.trades_df[
+                    self.trades_df["symbol"] == symbol
+                    ]
 
-            if trades_symbol.empty:
-                continue
+                if trades_symbol.empty:
+                    trades_symbol = None
 
             plotter = TradePlotter(
                 df=strategy.df_plot,
@@ -193,7 +200,7 @@ class BacktestRunner:
                 bearish_zones=strategy.get_bearish_zones(),
                 extra_series=strategy.get_extra_values_to_plot(),
                 bool_series=strategy.bool_series(),
-                title=f"{symbol} trades",
+                title=f"{symbol} chart",
             )
 
             plotter.plot()
@@ -202,17 +209,38 @@ class BacktestRunner:
     # ==================================================
     # 7️⃣ MAIN RUN
     # ==================================================
+    # ==================================================
+    # 7️⃣ MAIN RUN
+    # ==================================================
     def run(self):
 
-        print("🚀 Backtest start")
+        print("🚀 Runner start")
 
         all_data = self.load_data()
         self.run_strategies_parallel(all_data)
-        self.run_backtests()
-        self.run_report()
 
-        if self.config.BACKTEST_MODE == "single":
+        # ============================
+        # PLOT ONLY
+        # ============================
+        if self.config.PLOT_ONLY:
             self.plot_results()
+            print("📊 Plot-only finished")
+            return
 
-        print("🏁 Backtest finished")
+        # ============================
+        # BACKTEST
+        # ============================
+        self.run_backtests()
+
+        if self.config.BACKTEST_MODE == "backtest":
+            print("🧪 Backtest finished (no report / plot)")
+            return
+
+        # ============================
+        # FULL PIPELINE
+        # ============================
+        self.run_report()
+        self.plot_results()
+
+        print("🏁 Full run finished")
 

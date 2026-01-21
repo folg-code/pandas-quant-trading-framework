@@ -175,8 +175,8 @@ class Backtester:
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
 
-        print(pd.DataFrame(trades)
-)
+
+
 
         return pd.DataFrame(trades)
 
