@@ -4,77 +4,74 @@ import pandas as pd
 
 class PriceActionStateEngine:
     """
-    Stateful price action engine.
-    Produces structural events and extended states.
+    Price Action detection with explicit EVENT vs STATE separation.
+
+    Outputs per structure:
+    - *_event        : True only on event bar
+    - *_level        : price level created by event (ffilled)
+    - *_event_idx    : index of event bar (ffilled, state)
     """
 
-    def apply(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Price Action detection with explicit EVENT vs STATE separation.
-
-        Outputs per structure:
-        - *_event        : True only on event bar
-        - *_level        : price level created by event (ffilled)
-        - *_event_idx    : index of event bar (ffilled, state)
-        """
+    def apply(self, df: pd.DataFrame) -> dict[str, pd.Series]:
+        idx = df.index
+        out = {}
 
         actions = [
             # MSS
             {
-                'name': 'mss_bull',
-                'cond': (df['close'] > df['LH']) & (df['close'].shift(1) <= df['LH']),
-                'level': df['LH'],
+                "name": "mss_bull",
+                "cond": (df["close"] > df["LH"]) & (df["close"].shift(1) <= df["LH"]),
+                "level": df["LH"],
             },
             {
-                'name': 'mss_bear',
-                'cond': (df['close'] < df['HL']) & (df['close'].shift(1) >= df['HL']),
-                'level': df['HL'],
+                "name": "mss_bear",
+                "cond": (df["close"] < df["HL"]) & (df["close"].shift(1) >= df["HL"]),
+                "level": df["HL"],
             },
 
             # BOS
             {
-                'name': 'bos_bull',
-                'cond': (df['close'] > df['HH']) & (df['close'].shift(1) <= df['HH']),
-                'level': df['HH'],
+                "name": "bos_bull",
+                "cond": (df["close"] > df["HH"]) & (df["close"].shift(1) <= df["HH"]),
+                "level": df["HH"],
             },
             {
-                'name': 'bos_bear',
-                'cond': (df['close'] < df['LL']) & (df['close'].shift(1) >= df['LL']),
-                'level': df['LL'],
+                "name": "bos_bear",
+                "cond": (df["close"] < df["LL"]) & (df["close"].shift(1) >= df["LL"]),
+                "level": df["LL"],
             },
         ]
 
         for act in actions:
-            name = act['name']
+            name = act["name"]
+            cond = act["cond"]
 
             # ==========================
             # EVENT (impulse)
             # ==========================
-            df[f'{name}_event'] = act['cond']
+            event = cond.astype(bool)
 
             # ==========================
             # LEVEL CREATED BY EVENT
             # ==========================
-            df[f'{name}_level'] = np.where(
-                act['cond'],
-                act['level'],
-                np.nan
-            )
+            level = pd.Series(
+                np.where(cond, act["level"], np.nan),
+                index=idx
+            ).ffill()
 
             # ==========================
             # EVENT INDEX (STATEFUL)
             # ==========================
-            df[f'{name}_event_idx'] = np.where(
-                act['cond'],
-                df.index,
-                np.nan
-            )
+            event_idx = pd.Series(
+                np.where(cond, idx, np.nan),
+                index=idx
+            ).ffill()
 
             # ==========================
-            # FORWARD FILL STATE
+            # COLLECT OUTPUT
             # ==========================
-            df[f'{name}_level'] = df[f'{name}_level'].ffill()
-            df[f'{name}_event_idx'] = df[f'{name}_event_idx'].ffill()
+            out[f"{name}_event"] = event
+            out[f"{name}_level"] = level
+            out[f"{name}_event_idx"] = event_idx
 
-
-        return df
+        return out

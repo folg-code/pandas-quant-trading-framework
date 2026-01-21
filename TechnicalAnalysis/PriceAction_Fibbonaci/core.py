@@ -38,14 +38,16 @@ class IntradayMarketStructure:
             prefix=f"fibo_range"
         )
 
+        self.price_action_engine = PriceActionStateEngine()
+
         # =========================
         # ENGINE
         # =========================
         self.engine = MarketStructureEngine(
             pivot_detector=PivotDetector(self.pivot_range),
             relations=PivotRelations(),
-            fibo=None,  # fibo obsłużymy ręcznie (2 tryby)
-            price_action=PriceActionStateEngine(),
+            fibo=None,
+            price_action=None,  # PA obsługujemy ręcznie
         )
 
     # =============================================================
@@ -119,11 +121,81 @@ class IntradayMarketStructure:
 
         df = df.assign(**out)
 
-        print(list(df.columns))
+
         return df
 
     def detect_price_action(self, df):
-        return PriceActionStateEngine().apply(df)
+        out = self.price_action_engine.apply(df)
+        df = df.assign(**out)
+
+        print(list(df.columns))
+        return df
+
+    def track_bos_follow_through(self, df):
+
+        # ===============================
+        # 1️⃣ INICJALIZACJA
+        # ===============================
+        df['bos_dir'] = None
+        df['bos_price'] = np.nan
+        df['bos_idx_event'] = np.nan
+
+        # ===============================
+        # 2️⃣ BOS EVENT (JEDNOZNACZNIE)
+        # ===============================
+        df.loc[df['bos_bull_event'], 'bos_dir'] = 'bull'
+        df.loc[df['bos_bear_event'], 'bos_dir'] = 'bear'
+
+        df.loc[df['bos_bull_event'], 'bos_price'] = df['bos_bull_level']
+        df.loc[df['bos_bear_event'], 'bos_price'] = df['bos_bear_level']
+
+        mask = df['bos_bull_event'] | df['bos_bear_event']
+        df.loc[mask, 'bos_idx_event'] = df.index[mask]
+
+        # ===============================
+        # 3️⃣ FORWARD FILL – AKTYWNY BOS
+        # ===============================
+        df['bos_dir'] = df['bos_dir'].ffill()
+        df['bos_price'] = df['bos_price'].ffill()
+        df['bos_idx_event'] = df['bos_idx_event'].ffill()
+
+        # ===============================
+        # 4️⃣ BARS SINCE BOS
+        # ===============================
+        df['bars_since_bos'] = df.index - df['bos_idx_event']
+
+        # ===============================
+        # 5️⃣ ATR W MOMENCIE BOS
+        # ===============================
+        df['atr_at_bos'] = np.where(
+            df.index == df['bos_idx_event'],
+            df['atr'],
+            np.nan
+        )
+        df['atr_at_bos'] = df['atr_at_bos'].ffill()
+
+        # ===============================
+        # 6️⃣ MFE / MAE
+        # ===============================
+        df['mfe_from_bos'] = np.nan
+        df['mae_from_bos'] = np.nan
+
+        bull_mask = df['bos_dir'] == 'bull'
+        bear_mask = df['bos_dir'] == 'bear'
+
+        df.loc[bull_mask, 'mfe_from_bos'] = df['high'] - df['bos_price']
+        df.loc[bull_mask, 'mae_from_bos'] = df['bos_price'] - df['low']
+
+        df.loc[bear_mask, 'mfe_from_bos'] = df['bos_price'] - df['low']
+        df.loc[bear_mask, 'mae_from_bos'] = df['high'] - df['bos_price']
+
+        # ===============================
+        # 7️⃣ NORMALIZACJA
+        # ===============================
+        df['follow_through_atr'] = df['mfe_from_bos'] / df['atr_at_bos']
+        df['adverse_atr'] = df['mae_from_bos'] / df['atr_at_bos']
+
+        return df
 
 
 
@@ -310,71 +382,7 @@ class IntradayMarketStructure:
         return df
 
 
-    def track_bos_follow_through(self, df):
 
-        # ===============================
-        # 1️⃣ INICJALIZACJA
-        # ===============================
-        df['bos_dir'] = None
-        df['bos_price'] = np.nan
-        df['bos_idx_event'] = np.nan
-
-        # ===============================
-        # 2️⃣ BOS EVENT (JEDNOZNACZNIE)
-        # ===============================
-        df.loc[df['bos_bull_event'], 'bos_dir'] = 'bull'
-        df.loc[df['bos_bear_event'], 'bos_dir'] = 'bear'
-
-        df.loc[df['bos_bull_event'], 'bos_price'] = df['bos_bull_level']
-        df.loc[df['bos_bear_event'], 'bos_price'] = df['bos_bear_level']
-
-        mask = df['bos_bull_event'] | df['bos_bear_event']
-        df.loc[mask, 'bos_idx_event'] = df.index[mask]
-
-        # ===============================
-        # 3️⃣ FORWARD FILL – AKTYWNY BOS
-        # ===============================
-        df['bos_dir'] = df['bos_dir'].ffill()
-        df['bos_price'] = df['bos_price'].ffill()
-        df['bos_idx_event'] = df['bos_idx_event'].ffill()
-
-        # ===============================
-        # 4️⃣ BARS SINCE BOS
-        # ===============================
-        df['bars_since_bos'] = df.index - df['bos_idx_event']
-
-        # ===============================
-        # 5️⃣ ATR W MOMENCIE BOS
-        # ===============================
-        df['atr_at_bos'] = np.where(
-            df.index == df['bos_idx_event'],
-            df['atr'],
-            np.nan
-        )
-        df['atr_at_bos'] = df['atr_at_bos'].ffill()
-
-        # ===============================
-        # 6️⃣ MFE / MAE
-        # ===============================
-        df['mfe_from_bos'] = np.nan
-        df['mae_from_bos'] = np.nan
-
-        bull_mask = df['bos_dir'] == 'bull'
-        bear_mask = df['bos_dir'] == 'bear'
-
-        df.loc[bull_mask, 'mfe_from_bos'] = df['high'] - df['bos_price']
-        df.loc[bull_mask, 'mae_from_bos'] = df['bos_price'] - df['low']
-
-        df.loc[bear_mask, 'mfe_from_bos'] = df['bos_price'] - df['low']
-        df.loc[bear_mask, 'mae_from_bos'] = df['high'] - df['bos_price']
-
-        # ===============================
-        # 7️⃣ NORMALIZACJA
-        # ===============================
-        df['follow_through_atr'] = df['mfe_from_bos'] / df['atr_at_bos']
-        df['adverse_atr'] = df['mae_from_bos'] / df['atr_at_bos']
-
-        return df
 
     def detect_microstructure_regime(
             self,
