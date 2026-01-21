@@ -7,6 +7,7 @@ from debugpy.launcher.debuggee import describe
 
 from TechnicalAnalysis.MarketStructure.engine import MarketStructureEngine
 from TechnicalAnalysis.MarketStructure.fibo import FiboCalculator
+from TechnicalAnalysis.MarketStructure.follow_through import PriceActionFollowThrough
 from TechnicalAnalysis.MarketStructure.pivots import PivotDetector
 from TechnicalAnalysis.MarketStructure.price_action import PriceActionStateEngine
 from TechnicalAnalysis.MarketStructure.relations import PivotRelations
@@ -50,6 +51,11 @@ class IntradayMarketStructure:
             price_action=None,  # PA obsługujemy ręcznie
         )
 
+        self.pa_follow_through = PriceActionFollowThrough(
+            atr_mult=1.0,
+            lookahead=5,
+        )
+
     # =============================================================
     # PUBLIC ENTRYPOINT
     # =============================================================
@@ -68,7 +74,7 @@ class IntradayMarketStructure:
         df = self.detect_fibo(df)
         df = self.detect_price_action(df)
 
-        self.track_bos_follow_through(df)
+        df = self.detect_follow_through(df)
         self.detect_trend_regime(df)
         self.generate_price_action_context(df)
         self.enrich_pa_context(df)
@@ -85,7 +91,7 @@ class IntradayMarketStructure:
         df = self.engine.apply(df)
 
         # reszta wciąż legacy (tymczasowo)
-        self.track_bos_follow_through(df)
+        #self.track_bos_follow_through(df)
         self.detect_trend_regime(df)
         self.generate_price_action_context(df)
         self.enrich_pa_context(df)
@@ -128,73 +134,14 @@ class IntradayMarketStructure:
         out = self.price_action_engine.apply(df)
         df = df.assign(**out)
 
-        print(list(df.columns))
+
         return df
 
-    def track_bos_follow_through(self, df):
+    def detect_follow_through(self, df):
+        out = self.pa_follow_through.apply(df)
+        df = df.assign(**out)
 
-        # ===============================
-        # 1️⃣ INICJALIZACJA
-        # ===============================
-        df['bos_dir'] = None
-        df['bos_price'] = np.nan
-        df['bos_idx_event'] = np.nan
-
-        # ===============================
-        # 2️⃣ BOS EVENT (JEDNOZNACZNIE)
-        # ===============================
-        df.loc[df['bos_bull_event'], 'bos_dir'] = 'bull'
-        df.loc[df['bos_bear_event'], 'bos_dir'] = 'bear'
-
-        df.loc[df['bos_bull_event'], 'bos_price'] = df['bos_bull_level']
-        df.loc[df['bos_bear_event'], 'bos_price'] = df['bos_bear_level']
-
-        mask = df['bos_bull_event'] | df['bos_bear_event']
-        df.loc[mask, 'bos_idx_event'] = df.index[mask]
-
-        # ===============================
-        # 3️⃣ FORWARD FILL – AKTYWNY BOS
-        # ===============================
-        df['bos_dir'] = df['bos_dir'].ffill()
-        df['bos_price'] = df['bos_price'].ffill()
-        df['bos_idx_event'] = df['bos_idx_event'].ffill()
-
-        # ===============================
-        # 4️⃣ BARS SINCE BOS
-        # ===============================
-        df['bars_since_bos'] = df.index - df['bos_idx_event']
-
-        # ===============================
-        # 5️⃣ ATR W MOMENCIE BOS
-        # ===============================
-        df['atr_at_bos'] = np.where(
-            df.index == df['bos_idx_event'],
-            df['atr'],
-            np.nan
-        )
-        df['atr_at_bos'] = df['atr_at_bos'].ffill()
-
-        # ===============================
-        # 6️⃣ MFE / MAE
-        # ===============================
-        df['mfe_from_bos'] = np.nan
-        df['mae_from_bos'] = np.nan
-
-        bull_mask = df['bos_dir'] == 'bull'
-        bear_mask = df['bos_dir'] == 'bear'
-
-        df.loc[bull_mask, 'mfe_from_bos'] = df['high'] - df['bos_price']
-        df.loc[bull_mask, 'mae_from_bos'] = df['bos_price'] - df['low']
-
-        df.loc[bear_mask, 'mfe_from_bos'] = df['bos_price'] - df['low']
-        df.loc[bear_mask, 'mae_from_bos'] = df['high'] - df['bos_price']
-
-        # ===============================
-        # 7️⃣ NORMALIZACJA
-        # ===============================
-        df['follow_through_atr'] = df['mfe_from_bos'] / df['atr_at_bos']
-        df['adverse_atr'] = df['mae_from_bos'] / df['atr_at_bos']
-
+        print(list(df.columns))
         return df
 
 
