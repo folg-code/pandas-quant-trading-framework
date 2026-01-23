@@ -7,7 +7,7 @@ from TechnicalAnalysis.MarketStructure.pivots import PivotDetector, PivotDetecto
 from TechnicalAnalysis.MarketStructure.price_action_liquidity import PriceActionLiquidityResponse
 from TechnicalAnalysis.MarketStructure.relations import PivotRelations, PivotRelationsBatched
 from TechnicalAnalysis.MarketStructure.fibo import FiboCalculator, FiboBatched
-from TechnicalAnalysis.MarketStructure.price_action import PriceActionStateEngine
+from TechnicalAnalysis.MarketStructure.price_action import PriceActionStateEngine, PriceActionStateEngineBatched
 from TechnicalAnalysis.MarketStructure.follow_through import PriceActionFollowThrough
 from TechnicalAnalysis.MarketStructure.structural_volatility import PriceActionStructuralVolatility
 from TechnicalAnalysis.MarketStructure.trend_regime import PriceActionTrendRegime
@@ -124,8 +124,20 @@ class IntradayMarketStructure:
             assert eq(legacy[k], batched[k]), k
 
         print("FIBO SAME")
-        #out.update(self.detect_fibo(df))
-        #out.update(self.detect_price_action(df))
+
+        legacy_out = PriceActionStateEngine().apply(df_legacy)
+
+        batched_out = PriceActionStateEngineBatched().apply(
+            pivots=pivots_legacy,
+            close=df["close"],
+        )
+
+        for k in legacy_out:
+            assert eq(legacy_out[k], batched_out[k]), k
+
+        print("PRICE ACTION STATE ENGINE: 1:1 OK")
+
+
         #out.update(self.detect_follow_through(df))
         #out.update(self.detect_price_action_liquidity_response(df))
         #out.update(self.calculate_structural_volatility(df))
