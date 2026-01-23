@@ -5,7 +5,7 @@ import pandas as pd
 from TechnicalAnalysis.MarketStructure.engine import MarketStructureEngine
 from TechnicalAnalysis.MarketStructure.pivots import PivotDetector, PivotDetectorBatched
 from TechnicalAnalysis.MarketStructure.price_action_liquidity import PriceActionLiquidityResponse
-from TechnicalAnalysis.MarketStructure.relations import PivotRelations
+from TechnicalAnalysis.MarketStructure.relations import PivotRelations, PivotRelationsBatched
 from TechnicalAnalysis.MarketStructure.fibo import FiboCalculator
 from TechnicalAnalysis.MarketStructure.price_action import PriceActionStateEngine
 from TechnicalAnalysis.MarketStructure.follow_through import PriceActionFollowThrough
@@ -78,10 +78,7 @@ class IntradayMarketStructure:
     def apply_legacy(self, df: pd.DataFrame) -> pd.DataFrame:
         out: dict[str, pd.Series] = {}
 
-        out.update(self.detect_peaks(df))
 
-        old = PivotDetector(self.pivot_range).apply(df)
-        new = PivotDetectorBatched(self.pivot_range).apply(df)
 
         def equal_series(a: pd.Series, b: pd.Series) -> bool:
             return (
@@ -91,16 +88,30 @@ class IntradayMarketStructure:
                 )
             )
 
-        for k in old:
-            assert equal_series(old[k], new[k]), k
+        # legacy
+        pivots_legacy = PivotDetector(self.pivot_range).apply(df)
+        df_legacy = df.assign(**pivots_legacy)
+        relations_legacy = PivotRelations().apply(df_legacy)
 
-        out.update(self.detect_eqh_eql_from_pivots(df))
-        out.update(self.detect_fibo(df))
-        out.update(self.detect_price_action(df))
-        out.update(self.detect_follow_through(df))
-        out.update(self.detect_price_action_liquidity_response(df))
-        out.update(self.calculate_structural_volatility(df))
-        out.update(self.detect_trend_regime(df))
+        # batched
+        pivots_batched = PivotDetectorBatched(self.pivot_range).apply(df)
+        relations_batched = PivotRelationsBatched().apply(
+            pivots=pivots_batched,
+            atr=df["atr"]
+        )
+
+        # compare
+        for k in relations_legacy:
+            assert equal_series(relations_legacy[k], relations_batched[k]), k
+
+        print("COLUMNS SAME")
+
+        #out.update(self.detect_fibo(df))
+        #out.update(self.detect_price_action(df))
+        #out.update(self.detect_follow_through(df))
+        #out.update(self.detect_price_action_liquidity_response(df))
+        #out.update(self.calculate_structural_volatility(df))
+        #out.update(self.detect_trend_regime(df))
 
         return df.assign(**out)
 
