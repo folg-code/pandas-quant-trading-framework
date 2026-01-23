@@ -10,7 +10,8 @@ from TechnicalAnalysis.MarketStructure.relations import PivotRelations, PivotRel
 from TechnicalAnalysis.MarketStructure.fibo import FiboCalculator, FiboBatched
 from TechnicalAnalysis.MarketStructure.price_action import PriceActionStateEngine, PriceActionStateEngineBatched
 from TechnicalAnalysis.MarketStructure.follow_through import PriceActionFollowThrough, PriceActionFollowThroughBatched
-from TechnicalAnalysis.MarketStructure.structural_volatility import PriceActionStructuralVolatility
+from TechnicalAnalysis.MarketStructure.structural_volatility import PriceActionStructuralVolatility, \
+    PriceActionStructuralVolatilityBatched
 from TechnicalAnalysis.MarketStructure.trend_regime import PriceActionTrendRegime
 
 
@@ -187,15 +188,32 @@ class IntradayMarketStructure:
             df=df,
         )
 
-        print(batched)
 
         for k in legacy:
             assert eq(legacy[k], batched[k]), k
 
         print("LIQUIDITY RESPONSE BATCHED: 1:1 OK")
 
-        #out.update(self.detect_price_action_liquidity_response(df))
-        #out.update(self.calculate_structural_volatility(df))
+        legacy = PriceActionStructuralVolatility(
+            event_source="bos",
+            direction="bull",
+        ).apply(df_legacy)
+
+        batched = PriceActionStructuralVolatilityBatched(
+            event_source="bos",
+            direction="bull",
+        ).apply(
+            events={
+                "bos_bull_event": batched_out["bos_bull_event"],
+            },
+            df=df,
+        )
+
+        for k in legacy:
+            assert legacy[k].fillna(-1).equals(batched[k].fillna(-1)), k
+
+        print("STRUCTURAL VOLATILITY BATCHED: 1:1 OK")
+
         #out.update(self.detect_trend_regime(df))
 
         return df.assign(**out)
