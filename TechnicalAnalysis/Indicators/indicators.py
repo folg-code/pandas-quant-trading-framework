@@ -497,7 +497,60 @@ def keltner_channel(bars, window=14, atrs=2):
         'lower': lower.values
     })
 
+# ---------------------------------------------
+def vwap_bands(bars, stds=(1.0, 2.0), window=50):
+    """
+    Daily VWAP with intraday deviation bands
 
+    bars: DataFrame with columns [high, low, close, volume, time]
+    stds: tuple of std multipliers (e.g. (1.0, 2.0))
+    window: rolling window for intraday std
+    """
+
+    # -------------------------------------------------
+    # Typical price
+    # -------------------------------------------------
+    tp = (bars['high'] + bars['low'] + bars['close']) / 3.0
+
+    # -------------------------------------------------
+    # Session key (daily reset)
+    # -------------------------------------------------
+    session = bars['time'].dt.date
+
+    # -------------------------------------------------
+    # VWAP core
+    # -------------------------------------------------
+    tp_x_vol = tp * bars['tick_volume']
+
+    cum_tp_vol = tp_x_vol.groupby(session).cumsum()
+    cum_vol = bars['tick_volume'].groupby(session).cumsum()
+
+    vwap = cum_tp_vol / cum_vol
+
+    # -------------------------------------------------
+    # Intraday deviation
+    # -------------------------------------------------
+    dev = tp - vwap
+
+    vwap_std = (
+        dev.groupby(session)
+        .rolling(window=window, min_periods=10)
+        .std()
+        .reset_index(level=0, drop=True)
+    )
+
+    # -------------------------------------------------
+    # Bands
+    # -------------------------------------------------
+    data = {
+        'vwap': vwap.values,
+    }
+
+    for n in stds:
+        data[f'upper_{n}'] = (vwap + n * vwap_std).values
+        data[f'lower_{n}'] = (vwap - n * vwap_std).values
+
+    return pd.DataFrame(index=bars.index, data=data)
 # ---------------------------------------------
 
 def roc(series, window=14):
@@ -780,6 +833,7 @@ PandasObject.hull_moving_average = hull_moving_average
 PandasObject.ibs = ibs
 PandasObject.implied_volatility = implied_volatility
 PandasObject.keltner_channel = keltner_channel
+PandasObject.vwap_bands = vwap_bands
 PandasObject.log_returns = log_returns
 PandasObject.macd = macd
 PandasObject.returns = returns

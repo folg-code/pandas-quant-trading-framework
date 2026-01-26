@@ -1,3 +1,5 @@
+#TechnicalAnalysis/PointOfInterestSMC/core.py
+
 import re
 
 import pandas as pd
@@ -7,136 +9,136 @@ from .utils.validate import invalidate_zones_by_candle_extremes_multi
 from .utils.mark_reaction import mark_zone_reactions
 
 class SmartMoneyConcepts:
-    def __init__(self, df: pd.DataFrame, time_col: str = "time"):
-        self.df = df.copy()
-        self.time_col = time_col
-        self.df[self.time_col] = pd.to_datetime(self.df[self.time_col], errors='coerce', utc=True)
 
-    # -----------------------------
-    # 1️⃣ Szukanie stref na wybranym TF
-    # -----------------------------
-    def find_validate_zones(self, tf: str = "", **kwargs):
+    def detect_zones(
+        self,
+        df: pd.DataFrame,
+        tf: str,
+        fvg_multiplier: float = 1.3
+    ) -> pd.DataFrame:
         """
-        Tworzy strefy (OB/FVG itp.) na podstawie df.
-        tf: nazwa TF, dodawana do atrybutów
-        kwargs mogą zawierać pivot_range, atr_multiplier itd.
+        HTF ONLY
+        Zwraca DataFrame stref (OB/FVG), bez side-effectów.
         """
-        bullish_fvg, bearish_fvg = detect_fvg(self.df, kwargs.get("fvg_multiplier", 1.3))
-        bearish_ob, bullish_ob, _ = detect_ob(
-            self.df,
-            pivot_range=kwargs.get("pivot_range", 3),
-            min_candles=kwargs.get("min_candles", 3),
-            atr_multiplier=kwargs.get("atr_multiplier", 1.0)
+
+        bullish_fvg, bearish_fvg = detect_fvg(df, fvg_multiplier)
+        bearish_ob, bullish_ob, _ = detect_ob(df)
+
+        zones = []
+
+        for zdf, ztype, direction in [
+            (bullish_fvg, "fvg", "bullish"),
+            (bullish_ob, "ob", "bullish"),
+            (bearish_fvg, "fvg", "bearish"),
+            (bearish_ob, "ob", "bearish"),
+        ]:
+            if zdf is None or zdf.empty:
+                continue
+
+            z = zdf.copy()
+            z["zone_type"] = ztype
+            z["direction"] = direction
+            z["tf"] = tf
+            zones.append(z)
+
+        if not zones:
+            return pd.DataFrame()
+
+        zones = pd.concat(zones, ignore_index=True).sort_values("idx")
+
+        bullish = zones[zones["direction"] == "bullish"]
+        bearish = zones[zones["direction"] == "bearish"]
+
+        bullish_v, bearish_v = invalidate_zones_by_candle_extremes_multi(
+            tf,
+            df,
+            bullish,
+            bearish
         )
 
-        # Przypisanie kierunku i typu strefy
-        for df_, ztype, direction in [(bullish_fvg, "fvg", "bullish"),
-                                      (bullish_ob, "ob", "bullish"),
-                                      (bearish_fvg, "fvg", "bearish"),
-                                      (bearish_ob, "ob", "bearish")]:
-            df_["zone_type"] = ztype
-            df_["direction"] = direction
-            df_["tf"] = tf
+        return pd.concat([bullish_v, bearish_v], ignore_index=True)
 
-        # Scalanie stref
-        bullish_zones = pd.concat(
-            [bullish_fvg, bullish_ob],
-            ignore_index=True
-        ).sort_values(by='idx')
-        bearish_zones = pd.concat(
-            [bearish_fvg, bearish_ob],
-            ignore_index=True
-        ).sort_values(by='idx')
+    def apply_reactions(
+            self,
+            df: pd.DataFrame,
+            zones: pd.DataFrame,
+    ):
+        """
+        LTF ONLY
+        Dodaje kolumny reaction / in_zone do df.
+        """
 
-        # Walidacja stref
-        bullish_zones_validated, bearish_zones_validated = (
-            invalidate_zones_by_candle_extremes_multi(
-                tf,
-                self.df,
-                bullish_zones,
-                bearish_zones
+        if zones is None or zones.empty:
+            return df
+
+        reactions = mark_zone_reactions(df, zones)
+
+        new_cols = reactions.columns.difference(df.columns)
+        if len(new_cols) == 0:
+            return df
+
+        df[new_cols] = reactions[new_cols].to_numpy()
+        return df
+
+    def aggregate_active_zones(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Agreguje aktywne strefy do list:
+        - htf_long_active / htf_short_active
+        - ltf_long_active / ltf_short_active
+        """
+
+        df = df.copy()
+
+        # ================================
+        # 1️⃣ SAFE ZONE CHECK
+        # ================================
+        def zone_active(base: str, suffix: str = "") -> pd.Series:
+            col_in = f"{base}_in_zone{suffix}"
+            col_react = f"{base}_reaction{suffix}"
+
+            in_zone = df[col_in] if col_in in df.columns else pd.Series(False, index=df.index)
+            reaction = df[col_react] if col_react in df.columns else pd.Series(False, index=df.index)
+
+            return in_zone | reaction
+
+        # ================================
+        # 2️⃣ DEFINICJE STREF
+        # ================================
+        HTF_LONG_ZONES = {
+            "bullish_ob": zone_active("bullish_ob", "_M30"),
+            "bullish_breaker": zone_active("bullish_breaker", "_M30"),
+        }
+
+        HTF_SHORT_ZONES = {
+            "bearish_ob": zone_active("bearish_ob", "_M30"),
+            "bearish_breaker": zone_active("bearish_breaker", "_M30"),
+        }
+
+        LTF_LONG_ZONES = {
+            "bullish_ob": zone_active("bullish_ob"),
+            "bullish_breaker": zone_active("bullish_breaker"),
+        }
+
+        LTF_SHORT_ZONES = {
+            "bearish_ob": zone_active("bearish_ob"),
+            "bearish_breaker": zone_active("bearish_breaker"),
+        }
+
+        # ================================
+        # 3️⃣ AGREGACJA DO LIST
+        # ================================
+        def collect_zones(zone_map):
+            return pd.Series(
+                [
+                    [name for name, mask in zone_map.items() if mask.iloc[i]]
+                    for i in range(len(df))
+                ],
+                index=df.index,
             )
-        )
 
-        # Dynamiczne atrybuty z sufiksem _{tf} tylko jeśli tf != "M5"
-        tf_suffix = f"_{tf}" if tf and tf != "M5" else ""
+        df["htf_long_active"] = collect_zones(HTF_LONG_ZONES)
+        df["htf_short_active"] = collect_zones(HTF_SHORT_ZONES)
+        df["ltf_long_active"] = collect_zones(LTF_LONG_ZONES)
+        df["ltf_short_active"] = collect_zones(LTF_SHORT_ZONES)
 
-        setattr(
-            self,
-            f"bullish_fvg_validated{tf_suffix}",
-            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'fvg'].copy()
-        )
-        setattr(
-            self,
-            f"bullish_ob_validated{tf_suffix}",
-            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ob'].copy()
-        )
-        setattr(
-            self,
-            f"bullish_breaker_validated{tf_suffix}",
-            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'breaker'].copy()
-        )
-        setattr(
-            self,
-            f"bullish_ifvg_validated{tf_suffix}",
-            bullish_zones_validated[bullish_zones_validated['zone_type'] == 'ifvg'].copy()
-        )
-        setattr(
-            self,
-            f"bearish_fvg_validated{tf_suffix}",
-            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'fvg'].copy()
-        )
-        setattr(
-            self,
-            f"bearish_ob_validated{tf_suffix}",
-            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ob'].copy()
-        )
-        setattr(
-            self,
-            f"bearish_breaker_validated{tf_suffix}",
-            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'breaker'].copy()
-        )
-        setattr(
-            self,
-            f"bearish_ifvg_validated{tf_suffix}",
-            bearish_zones_validated[bearish_zones_validated['zone_type'] == 'ifvg'].copy()
-        )
-
-
-
-    # -----------------------------
-    # 3️⃣ Reakcje ceny (tylko docelowy TF)
-    # -----------------------------
-    def detect_reaction(self):
-        """
-        Zbiera wszystkie validated zones z różnych TF i typów, sprawdza reakcje,
-        waliduje breakery i IFVG oraz ustawia dynamiczne atrybuty klasy.
-        """
-
-        # --- 1️⃣ Zbierz wszystkie strefy walidowane ---
-        all_zones_frames = []
-        pattern = re.compile(r'^(bullish|bearish)_(fvg|ob|breaker|ifvg)_validated(?:_(\w+))?$')
-
-        for attr_name in dir(self):
-            match = pattern.match(attr_name)
-            if match:
-                df = getattr(self, attr_name)
-                if df is not None and not df.empty:
-                    direction, zone_type, tf = match.groups()
-                    tf = tf if tf else "M5"  # domyślny TF = M5
-                    df_copy = df.copy()
-                    df_copy["direction"] = direction
-                    df_copy["tf"] = tf
-                    all_zones_frames.append(df_copy)
-
-        if not all_zones_frames:
-            return
-        all_zones = pd.concat(all_zones_frames, ignore_index=True)
-
-        # --- 2️⃣ Reakcje na strefy ---
-        df = mark_zone_reactions(self.df, all_zones)
-
-
-        self.df = df
-
-
+        return df

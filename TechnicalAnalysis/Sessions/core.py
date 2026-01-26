@@ -1,104 +1,69 @@
-#TechnicalAnalysis/SessionsSMC/core.py
+#TechnicalAnalysis/Sessions/core.py
 
 import numpy as np
 import pandas as pd
 
 
-class SessionsSMC:
+class Sessions:
     def __init__(self, df: pd.DataFrame):
         self.df = df.copy()
 
 
-
-    def calculate_previous_ranges(self):
-
-        df = self.df.copy()
-        df['date'] = df['time'].dt.floor('D')  # pełna data (00:00)
+    @staticmethod
+    def calculate_previous_ranges(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df['time'] = pd.to_datetime(df['time'], utc=True)
+        df['date'] = df['time'].dt.floor('D')
         df['weekday'] = df['time'].dt.weekday
-        df['week'] = df['time'].dt.isocalendar().week
         df['year'] = df['time'].dt.isocalendar().year
+        df['week'] = df['time'].dt.isocalendar().week
         df['hour'] = df['time'].dt.hour
+        df['minute'] = df['time'].dt.minute
 
-        # MONDAY HIGH/LOW
-        monday_data = df[df['weekday'] == 0].copy()
-        monday_data['monday'] = monday_data['date']
-        monday_ranges = monday_data.groupby(['year', 'week']).agg({
-            'high': 'max',
-            'low': 'min',
-            'monday': 'first'
-        }).reset_index()
-        df = df.merge(monday_ranges, on=['year', 'week'], how='left', suffixes=('', '_monday'))
-        df.rename(columns={
-            'high_monday': 'monday_high',
-            'low_monday': 'monday_low'
-        }, inplace=True)
+        # --- Sesje ---
+        conditions = [
+            (df['hour'] >= 0) & (df['hour'] < 9),
+            (df['hour'] >= 7) & (df['hour'] < 16),
+            (df['hour'] >= 13) & (df['hour'] < 22),
+        ]
+        choices = ['asia', 'london', 'ny']
+        df['session'] = np.select(conditions, choices, default='other')
 
-        # PDH/PDL (Poprzedni dzień high/low)
-        daily_ranges = df.groupby('date').agg({
-            'high': 'max',
-            'low': 'min'
-        }).rename(columns={'high': 'PDH', 'low': 'PDL'}).reset_index()
+        # --- Killzone ---
+        df['asia_london_kz'] = (df['hour'] >= 0) & (df['hour'] < 16)
+        df['london_ny_kz'] = (df['hour'] >= 7) & (df['hour'] < 22)
 
-        # Shift o 1 dzień (dla poprzedniego dnia)
-        daily_ranges['date'] = pd.to_datetime(daily_ranges['date'])
+        # --- Monday high/low ---
+        monday_df = df[df['weekday'] == 0].groupby(['year', 'week']).agg(
+            monday_high=('high', 'max'),
+            monday_low=('low', 'min')
+        ).reset_index()
+        df = df.merge(monday_df, on=['year', 'week'], how='left')
+
+        # --- Previous day high/low ---
+        daily_ranges = df.groupby('date').agg(PDH=('high', 'max'), PDL=('low', 'min')).reset_index()
         daily_ranges['date_shift'] = daily_ranges['date'] + pd.Timedelta(days=1)
-
-        df = df.merge(
-            daily_ranges[['date_shift', 'PDH', 'PDL']],
-            left_on='date',
-            right_on='date_shift',
-            how='left'
-        )
+        df = df.merge(daily_ranges[['date_shift', 'PDH', 'PDL']], left_on='date', right_on='date_shift', how='left')
         df.drop(columns=['date_shift'], inplace=True)
 
-        # Weekly high/low (dla bieżącego tygodnia)
-        weekly_ranges = df.groupby(['year', 'week']).agg({
-            'high': 'max',
-            'low': 'min'
-        }).rename(columns={
-            'high': 'weekly_high',
-            'low': 'weekly_low'
-        }).reset_index()
-
+        # --- Weekly high/low ---
+        weekly_ranges = df.groupby(['year', 'week']).agg(
+            weekly_high=('high', 'max'),
+            weekly_low=('low', 'min')
+        ).reset_index()
         df = df.merge(weekly_ranges, on=['year', 'week'], how='left')
 
-        # PWH/PWL (Poprzedni tydzień high/low)
-        prev_weekly_ranges = weekly_ranges.copy()
-        prev_weekly_ranges['week'] += 1  # uwaga: działa jeśli nie przechodzisz przez granicę roku
-        prev_weekly_ranges.rename(columns={
-            'weekly_high': 'PWH',
-            'weekly_low': 'PWL'
-        }, inplace=True)
-
-        df = df.merge(prev_weekly_ranges[['year', 'week', 'PWH', 'PWL']], on=['year', 'week'], how='left')
-
-        # --- poprzedni open/close ---
-        daily_oc = df.groupby('date').agg({
-            'open': 'first',
-            'close': 'last'
-        }).rename(columns={'open': 'daily_open', 'close': 'daily_close'}).reset_index()
-
-        daily_oc['date'] = pd.to_datetime(daily_oc['date'])
-        daily_oc['date_shift'] = daily_oc['date'] + pd.Timedelta(days=1)
-
-        df = df.merge(
-            daily_oc[['date_shift', 'daily_open', 'daily_close']],
-            left_on='date',
-            right_on='date_shift',
-            how='left'
-        )
-
-        df.rename(columns={
-            'daily_open': 'prev_open',
-            'daily_close': 'prev_close'
-        }, inplace=True)
-
-        df.drop(columns=['date_shift'], inplace=True)
+        # --- Previous week high/low ---
+        prev_week = weekly_ranges.copy()
+        prev_week['week'] += 1  # uwaga: granica roku wymaga dodatkowej korekty
+        prev_week.rename(columns={'weekly_high': 'PWH', 'weekly_low': 'PWL'}, inplace=True)
+        df = df.merge(prev_week[['year', 'week', 'PWH', 'PWL']], on=['year', 'week'], how='left')
 
         return df
 
-    def calculate_sessions_ranges(self):
-        df = self.df.copy()
+
+    @staticmethod
+    def calculate_sessions_ranges(df: pd.DataFrame):
         df['time'] = pd.to_datetime(df['time'], utc=True)
         df['date'] = df['time'].dt.normalize()
         df['hour'] = df['time'].dt.hour
@@ -131,16 +96,6 @@ class SessionsSMC:
                     'ny_low']:
             df[col] = df[col].ffill()
 
-        df.drop(columns=['hour', 'date'], inplace=True, errors='ignore')
-        self.df = df
-
-    def detect_session_type(self):
-        """
-        Przypisuje każdej świecy odpowiednią sesję:
-        - asia_main, killzone_london, london_main, killzone_ny, ny_main
-        """
-        df = self.df.copy()
-        df['hour'] = df['time'].dt.hour
 
         conditions = [
             (df['hour'] >= 3) & (df['hour'] < 9),
@@ -152,7 +107,8 @@ class SessionsSMC:
         choices = ['asia_main', 'killzone_london', 'london_main', 'killzone_ny', 'ny_main']
 
         df['session'] = np.select(conditions, choices, default='other')
-        self.df = df
+
+        return df
 
     def calculate_prev_day_type(self, method: str = 'percentile', percentile: float = 0.5,
                                 ma_window: int = 5, atr_period: int = 14):

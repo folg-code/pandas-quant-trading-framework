@@ -8,7 +8,7 @@ MARKET_DATA_PATH = "mmarket_data"
 BACKTEST_DATA_BACKEND = "dukascopy"   # "dukascopy" | "csv"
 
 TIMERANGE = {
-    "start": "2025-12-01",
+    "start": "2025-01-01",
     "end":   "2025-12-31",
 }
 
@@ -24,14 +24,14 @@ BACKTEST_WINDOWS = {
 # STRATEGY
 # ==================================================
 
-STRATEGY_CLASS = "Hts"
+STRATEGY_CLASS = "Poisessions"
 STARTUP_CANDLE_COUNT = 600
 
 SYMBOLS = [
     "EURUSD",
 ]
 
-TIMEFRAME = "M1"
+TIMEFRAME = "M5"
 
 # ==================================================
 # EXECUTION (SIMULATED)
@@ -44,3 +44,5 @@ MAX_RISK_PER_TRADE = 0.005
 SAVE_TRADES_CSV = False
 
 SERVER_TIMEZONE = "UTC"
+
+PLOT_ONLY = True

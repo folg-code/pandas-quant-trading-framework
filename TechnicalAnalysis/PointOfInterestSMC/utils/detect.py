@@ -1,3 +1,5 @@
+#TechnicalAnalysis/PointOfInterestSMC/utis/detect.py
+
 import numpy as np
 import pandas as pd
 import talib.abstract as ta
@@ -7,115 +9,191 @@ import config
 
 
 
-def detect_ob(df2, pivot_range=3, min_candles=3, atr_multiplier=3.0):
-    df2 = df2.copy()
-    shift_idx = pivot_range + 1
+def detect_ob(
+    df,
+    pivot_range=3,
+    min_candles=3,
+    atr_thresholds=((3, 1.0), (5, 3.0), (10, 5.0))
+):
+    df = df.copy()
 
-    open_shift = df2["open"].shift(shift_idx)
-    close_shift = df2["close"].shift(shift_idx)
-    high_shift = df2["high"].shift(shift_idx)
-    low_shift = df2["low"].shift(shift_idx)
-    atr_shift = df2["atr"].shift(shift_idx)
-    idx_shift = df2['idx'].shift(shift_idx)
+    # ======================================================
+    # 1️⃣ STRUCTURAL ANCHORS (EVENT ID + SIDE)
+    # ======================================================
 
-    real_body = (open_shift - close_shift).abs()
-    candle_range = (high_shift - low_shift).replace(0, 1e-6)
-    body_to_range = real_body / candle_range
+    df['struct_event_id'] = np.nan
+    df['struct_side'] = None  # 'bull' / 'bear'
 
-    is_doji = body_to_range < 0.1
-    is_pinbar = (
-            ((high_shift - close_shift) > (candle_range * 0.6)
-            )
-            |((close_shift - low_shift) > (candle_range * 0.6)
-            )
+    # ------------------------------------------------------
+    # BEAR SIDE EVENTS → bullish OB candidates
+    # ------------------------------------------------------
+
+    # LL
+    ll_event = df['pivot'] == 4
+    df.loc[ll_event, 'struct_event_id'] = df.index[ll_event]
+    df.loc[ll_event, 'struct_side'] = 'bear'
+
+    # FIRST HL AFTER LL
+    hl_after_ll = (
+            (df['pivot'] == 6) &
+            (df['LL_idx'].notna()) &
+            (df['idx'] > df['LL_idx']) &
+            (df['idx'] == df['idx'].where(df['pivot'] == 6).groupby(df['LL_idx']).transform('min'))
     )
-    previous_red = (df2['close'].shift(2) < df2['open'].shift(2))
-    high_confirmation = (
-            (df2['high'].rolling(3).max().shift(shift_idx + 1) <=
-             df2['high'].shift(shift_idx)
-             )
-            |(df2[['open', 'close']].max(axis=1).rolling(3).max().shift(shift_idx + 1) <=
-              df2[['open', 'close']].max(axis=1).shift(shift_idx)
-            )
+    df.loc[hl_after_ll, 'struct_event_id'] = df.index[hl_after_ll]
+    df.loc[hl_after_ll, 'struct_side'] = 'bear'
+
+    # FAILED BOS BEAR
+    failed_bos_bear = (
+            df['bos_bear_event'] &
+            (df['follow_through_atr'].abs() < 0.5)
     )
-    bear_opposite = close_shift > open_shift
-    bear_valid_shape = (
-            bear_opposite
-            | (is_doji & previous_red & high_confirmation )
-            | (is_pinbar & previous_red & high_confirmation)
+    df.loc[failed_bos_bear, 'struct_event_id'] = df.index[failed_bos_bear]
+    df.loc[failed_bos_bear, 'struct_side'] = 'bear'
+
+    # ------------------------------------------------------
+    # BULL SIDE EVENTS → bearish OB candidates
+    # ------------------------------------------------------
+
+    # HH
+    hh_event = df['pivot'] == 3
+    df.loc[hh_event, 'struct_event_id'] = df.index[hh_event]
+    df.loc[hh_event, 'struct_side'] = 'bull'
+
+    # FIRST LH AFTER HH
+    lh_after_hh = (
+            (df['pivot'] == 5) &
+            (df['HH_idx'].notna()) &
+            (df['idx'] > df['HH_idx']) &
+            (df['idx'] == df['idx'].where(df['pivot'] == 5).groupby(df['HH_idx']).transform('min'))
+    )
+    df.loc[lh_after_hh, 'struct_event_id'] = df.index[lh_after_hh]
+    df.loc[lh_after_hh, 'struct_side'] = 'bull'
+
+    # FAILED BOS BULL
+    failed_bos_bull = (
+            df['bos_bull_event'] &
+            (df['follow_through_atr'].abs() < 0.5)
+    )
+    df.loc[failed_bos_bull, 'struct_event_id'] = df.index[failed_bos_bull]
+    df.loc[failed_bos_bull, 'struct_side'] = 'bull'
+
+    # ------------------------------------------------------
+    # FORWARD FILL ACTIVE CONTEXT
+    # ------------------------------------------------------
+
+    df['struct_event_id'] = df['struct_event_id'].ffill()
+    df['struct_side'] = df['struct_side'].ffill()
+
+    # ======================================================
+    # 2️⃣ OB CANDLE SHAPE (HISTORYCZNA ŚWIECA)
+    # ======================================================
+    shift = pivot_range + 1
+
+    open_s = df['open'].shift(shift)
+    close_s = df['close'].shift(shift)
+    high_s = df['high'].shift(shift)
+    low_s = df['low'].shift(shift)
+    atr_s = df['atr'].shift(shift)
+
+    body = (open_s - close_s).abs()
+    rng = (high_s - low_s).replace(0, 1e-6)
+    body_ratio = body / rng
+
+    is_opposite_bull = close_s < open_s
+    is_opposite_bear = close_s > open_s
+
+    bull_ob_candle = is_opposite_bull & (body_ratio > 0.3)
+    bear_ob_candle = is_opposite_bear & (body_ratio > 0.3)
+
+    # ======================================================
+    # 3️⃣ IMPULSE CONFIRMATION (DELAYED, NO LOOKAHEAD)
+    # ======================================================
+    impulse_up = np.zeros(len(df), dtype=bool)
+    impulse_down = np.zeros(len(df), dtype=bool)
+
+    for bars, atr_mult in atr_thresholds:
+        high_move = (
+            df['high']
+            .rolling(bars)
+            .max()
+            .shift(1) - low_s
+        ) > atr_s * atr_mult
+
+        low_move = (
+            high_s - df['low']
+            .rolling(bars)
+            .min()
+            .shift(1)
+        ) > atr_s * atr_mult
+
+        impulse_up |= high_move.fillna(False)
+        impulse_down |= low_move.fillna(False)
+
+    # ======================================================
+    # 4️⃣ VALID OB = OB CANDLE + IMPULSE + STRUCT CONTEXT
+    # ======================================================
+    df['bullish_cond'] = bull_ob_candle & impulse_up
+    df['bearish_cond'] = bear_ob_candle & impulse_down
+
+    # ======================================================
+    # 5️⃣ ONE OB PER STRUCT EVENT (ANTI-DUPLICATE)
+    # ======================================================
+    def first_true_per_group(x):
+        return x & (x.cumsum() == 1)
+
+    df['bullish_cond'] = (
+        df.groupby('struct_event_id')['bullish_cond']
+        .transform(first_true_per_group)
     )
 
-    bear_structure_break = df2["low"].shift(pivot_range) < low_shift
-    red_candles = (df2["close"] < df2["open"])
-    bear_impulse = red_candles.rolling(window=min_candles).sum() >= min_candles
-    bear_range_expansion = (high_shift - df2["low"]) > atr_shift * 3
-
-    bear_cond = (
-            bear_valid_shape &
-            bear_structure_break &
-            bear_impulse &
-            bear_range_expansion
-    )
-    low_confirmation = (
-            (df2['low'].rolling(3).min().shift(shift_idx + 1) >=
-             df2['low'].shift(shift_idx)
-            )
-            | (df2[['open', 'close']].min(axis=1).rolling(3).min().shift(shift_idx + 1) >=
-               df2[['open', 'close']].min(axis=1).shift(shift_idx)
-              )
-    )
-    previous_red = (df2['close'].shift(2) < df2['open'].shift(2))
-    bull_opposite = close_shift < open_shift
-    bull_valid_shape = (
-            bull_opposite
-            |(is_doji & previous_red & low_confirmation)
-            | (is_pinbar & previous_red & low_confirmation)
+    df['bearish_cond'] = (
+        df.groupby('struct_event_id')['bearish_cond']
+        .transform(first_true_per_group)
     )
 
-    bull_structure_break = df2["high"] > high_shift
-    green_candles = (df2["close"] > df2["open"])
-    bull_impulse = green_candles.rolling(window=min_candles).sum() >= min_candles
-    bull_range_expansion = (df2["high"] - low_shift) > atr_shift * 3
-
-    bull_cond = (
-            bull_valid_shape &
-            bull_structure_break &
-            bull_impulse &
-            bull_range_expansion
-    )
-
-    # ---------------------
-    # FILTR ANTY-DUPLIKATOWY (max 1 OB co 5 świec)
-    # ---------------------
+    # ======================================================
+    # 4️⃣.5 ANTI-DUPLICATE (OLD VERSION STYLE)
+    # max 1 OB every N candles
+    # ======================================================
     lookback = 5
-    bear_cond &= ~(bear_cond
-                   .rolling(window=lookback, min_periods=1)
-                   .max().shift(1).fillna(False).astype(bool))
-    bull_cond &= ~(bull_cond
-                   .rolling(window=lookback, min_periods=1)
-                   .max().shift(1).fillna(False).astype(bool))
 
-    # ---------------------
-    # ZAPISANIE WYNIKÓW
-    # ---------------------
-    df2['bearish_cond'] = bear_cond
-    df2['bullish_cond'] = bull_cond
+    df['bullish_cond'] &= ~(
+        df['bullish_cond']
+        .rolling(window=lookback, min_periods=1)
+        .max()
+        .shift(1)
+        .fillna(False)
+        .astype(bool)
+    )
 
-    bearish_obs = pd.DataFrame({
-        'high_boundary': high_shift[bear_cond],
-        'low_boundary': low_shift[bear_cond],
-        'time': df2['time'][bear_cond],
-        'idx': idx_shift[bear_cond]
-    })
+    df['bearish_cond'] &= ~(
+        df['bearish_cond']
+        .rolling(window=lookback, min_periods=1)
+        .max()
+        .shift(1)
+        .fillna(False)
+        .astype(bool)
+    )
 
-    bullish_obs = pd.DataFrame({
-        'high_boundary': high_shift[bull_cond],
-        'low_boundary': low_shift[bull_cond],
-        'time': df2['time'][bull_cond],
-        'idx': idx_shift[bull_cond]
-    })
+    # ======================================================
+    # 5️⃣ OUTPUT DATAFRAMES (STABLE LENGTHS)
+    # ======================================================
+    bearish_obs = df.loc[df['bearish_cond'], [
+        'high', 'low', 'time', 'idx'
+    ]].rename(columns={
+        'high': 'high_boundary',
+        'low': 'low_boundary'
+    }).reset_index(drop=True)
 
-    cond = df2[['bullish_cond', 'bearish_cond']]
+    bullish_obs = df.loc[df['bullish_cond'], [
+        'high', 'low', 'time', 'idx'
+    ]].rename(columns={
+        'high': 'high_boundary',
+        'low': 'low_boundary'
+    }).reset_index(drop=True)
+
+    cond = df[['bullish_cond', 'bearish_cond']].copy()
 
     return bearish_obs, bullish_obs, cond
 

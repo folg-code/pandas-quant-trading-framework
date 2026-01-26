@@ -48,11 +48,13 @@ class TradePlotter:
     def plot(self):
         self._add_candles()
         self._add_pivots()
-        self._add_trades()
+
+        if self.trades is not None and not self.trades.empty:
+            self._add_trades()
+
         self._add_zones()
         self._add_extra_series()
         self._add_bool_series()
-        self._add_pivots()
         self._layout()
         return self.fig
 
