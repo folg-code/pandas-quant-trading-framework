@@ -69,7 +69,6 @@ class MarketStructureEngine:
         # =========================================================
         if "pivots" in features:
             pivots = M.pivot_detector(pivot_range).apply(df)
-            out.update(pivots)
             context["pivots"] = pivots
         else:
             pivots = None
@@ -101,8 +100,8 @@ class MarketStructureEngine:
                     prefix="fibo_range",
                 ).apply(pivots=pivots)
             )
+            context["fibo"] = fibo
 
-            out.update(fibo)
 
         # =========================================================
         # 4️⃣ PRICE ACTION
@@ -112,7 +111,6 @@ class MarketStructureEngine:
                 pivots=pivots,
                 close=df["close"],
             )
-            out.update(pa)
             context["price_action"] = pa
         else:
             pa = None
@@ -174,6 +172,7 @@ class MarketStructureEngine:
                     out.update(part)
 
             context["structural_vol"] = sv
+
         else:
             sv = None
 
