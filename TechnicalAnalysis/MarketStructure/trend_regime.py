@@ -84,10 +84,14 @@ class PriceActionTrendRegimeBatched:
         # =====================================================
         if self.vol_required:
             high_vol = (
-                (struct_vol.get("bos_bull_struct_vol", pd.Series(False, index=idx)) == "high")
-                | (struct_vol.get("bos_bear_struct_vol", pd.Series(False, index=idx)) == "high")
-                | (struct_vol.get("mss_bull_struct_vol", pd.Series(False, index=idx)) == "high")
-                | (struct_vol.get("mss_bear_struct_vol", pd.Series(False, index=idx)) == "high")
+                (struct_vol.get(
+                    "bos_bull_struct_vol", pd.Series(False, index=idx)) == "high")
+                | (struct_vol.get(
+                "bos_bear_struct_vol", pd.Series(False, index=idx)) == "high")
+                | (struct_vol.get(
+                "mss_bull_struct_vol", pd.Series(False, index=idx)) == "high")
+                | (struct_vol.get(
+                "mss_bear_struct_vol", pd.Series(False, index=idx)) == "high")
             )
 
             # 🔒 CRITICAL: legacy-equivalent semantics
@@ -102,11 +106,9 @@ class PriceActionTrendRegimeBatched:
 
         regime = pd.Series("range", index=idx)
 
-        # potem trendy (nadpisują transition)
         regime[(trend_bias >= 1) & high_vol] = "trend_up"
         regime[(trend_bias <= -1) & high_vol] = "trend_down"
 
-        # najpierw transition
         regime[(trend_bias.abs() >= 1) & ~high_vol] = "transition"
 
         # =====================================================

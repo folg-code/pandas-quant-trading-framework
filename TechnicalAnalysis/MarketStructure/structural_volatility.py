@@ -48,9 +48,6 @@ class PriceActionStructuralVolatilityBatched:
         p = self.event_source
         d = self.direction
 
-        # ======================================================
-        # ENSURE ATR
-        # ======================================================
         ensure_indicator(df, indicator="atr", period=self.atr_period)
 
         event = events[f"{p}_{d}_event"]

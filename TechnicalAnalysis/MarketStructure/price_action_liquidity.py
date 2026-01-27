@@ -40,10 +40,19 @@ class PriceActionLiquidityResponseBatched:
     ) -> dict[str, pd.Series]:
 
         if self.mode == "legacy":
-            return self._apply_legacy(events=events, levels=levels, follow_through=follow_through, df=df)
+            return self._apply_legacy(
+                events=events,
+                levels=levels,
+                follow_through=follow_through,
+                df=df
+            )
 
         if self.mode == "experimental":
-            return self._apply_experimental(events=events, levels=levels, df=df)
+            return self._apply_experimental(
+                events=events,
+                levels=levels,
+                df=df
+            )
 
         raise ValueError("mode must be 'legacy' or 'experimental'")
 
@@ -72,20 +81,15 @@ class PriceActionLiquidityResponseBatched:
         ft_valid = follow_through[f"{p}_{d}_ft_valid"]
         ft_weak = follow_through[f"{p}_{d}_ft_weak"]
 
-
-
-        # EVENT INDEX
         event_idx = pd.Series(np.nan, index=idx)
         event_idx[event] = idx[event]
         event_idx = event_idx.ffill()
 
         bars_since_event = idx - event_idx
 
-        # DISTANCE
         dist_atr = (df["close"] - level).abs() / df["atr"]
         max_dist_atr = dist_atr.groupby(event_idx).cummax()
 
-        # REACTION
         reaction = detect_level_reaction(
             df,
             level=level,
@@ -114,9 +118,6 @@ class PriceActionLiquidityResponseBatched:
         sr_flip = sr_flip.ffill().fillna(False)
 
         prefix = f"{p}_{d}"
-
-
-
 
         return {
             f"liq_grab_{prefix}": liq_grab,

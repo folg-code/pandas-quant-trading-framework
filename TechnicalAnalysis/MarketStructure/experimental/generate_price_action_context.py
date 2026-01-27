@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def generate_price_action_context(self, df):
     """
     Priority-aware PA event generator.

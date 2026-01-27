@@ -1,12 +1,5 @@
-# TechnicalAnalysis/MarketStructure/relations.py
-
-import warnings
-
 import numpy as np
 import pandas as pd
-import talib.abstract as ta
-
-from TechnicalAnalysis.MarketStructure.utils.ensure_indicator import ensure_indicator
 
 
 class PivotRelationsBatched:
@@ -40,15 +33,12 @@ class PivotRelationsBatched:
 
         HH_shift = pivots["HH_shift"]
         LL_shift = pivots["LL_shift"]
-        LH_shift = pivots["LH_shift"]
-        HL_shift = pivots["HL_shift"]
 
         HH_idx_shift = pivots["HH_idx_shift"]
         LL_idx_shift = pivots["LL_idx_shift"]
         LH_idx_shift = pivots["LH_idx_shift"]
         HL_idx_shift = pivots["HL_idx_shift"]
 
-        # === EQH ===
         eqh_hh = (
             HH_idx.notna()
             & HH_idx_shift.notna()
@@ -71,7 +61,6 @@ class PivotRelationsBatched:
         EQH_level[eqh_hh_lh] = HH[eqh_hh_lh]
         EQH_level = EQH_level.ffill()
 
-        # === EQL ===
         eql_ll = (
             LL_idx.notna()
             & LL_idx_shift.notna()

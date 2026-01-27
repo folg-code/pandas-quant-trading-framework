@@ -29,7 +29,11 @@ class FiboBatched:
         else:
             raise ValueError(f"Unknown fibo mode: {self.mode}")
 
-    def _fibo_swing(self, pivots: dict[str, pd.Series]) -> dict[str, pd.Series]:
+    def _fibo_swing(
+            self,
+            pivots: dict[str, pd.Series]
+    ) -> dict[str, pd.Series]:
+
         idx = pivots["HH"].index
 
         HH = pivots["HH"]
@@ -42,7 +46,6 @@ class FiboBatched:
         LH_idx = pivots["LH_idx"]
         HL_idx = pivots["HL_idx"]
 
-        # 1️⃣ last_low / last_high (IDENTYCZNIE)
         last_low = np.where(LL_idx > HL_idx, LL, HL)
         last_high = np.where(HH_idx > LH_idx, HH, LH)
 
@@ -67,15 +70,16 @@ class FiboBatched:
 
         return out
 
-    def _fibo_range(self, pivots: dict[str, pd.Series]) -> dict[str, pd.Series]:
-        idx = pivots["HH"].index
+    def _fibo_range(
+            self,
+            pivots: dict[str, pd.Series]
+    ) -> dict[str, pd.Series]:
 
         HH = pivots["HH"]
         LL = pivots["LL"]
         HH_idx = pivots["HH_idx"]
         LL_idx = pivots["LL_idx"]
 
-        # 1️⃣ ostatnie LL z indeksem < HH_idx
         valid_LL = LL.where(LL_idx < HH_idx)
         base_LL = valid_LL.ffill()
 

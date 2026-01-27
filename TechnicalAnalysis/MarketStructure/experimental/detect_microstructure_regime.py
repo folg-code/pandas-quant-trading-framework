@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def detect_microstructure_regime(
         self,
         df,
@@ -8,9 +11,7 @@ def detect_microstructure_regime(
         compression_thr: float = 0.6,
         expansion_thr: float = 1.4,
 ):
-    # ===============================
-    # 1️⃣ ZMIENNOŚĆ RELATYWNA
-    # ===============================
+
     df['atr_short'] = df['atr'].rolling(atr_short).mean()
     df['atr_long'] = df['atr'].rolling(atr_long).mean()
 
@@ -43,12 +44,11 @@ def detect_microstructure_regime(
             (df['body_ratio'] < 0.4)
     )
 
-    # rolling character
     df['impulse_freq'] = df['impulse_bar'].rolling(10).mean()
     df['overlap_freq'] = df['overlap_bar'].rolling(10).mean()
 
     # ===============================
-    # 4️⃣ REGIME LOGIC (DETERMINISTIC)
+    # 4️⃣ REGIME LOGIC
     # ===============================
     regime = np.full(len(df), 'normal', dtype=object)
 
@@ -57,14 +57,12 @@ def detect_microstructure_regime(
             df['rolling_range'].rolling(50).median() * 0.7
     )
 
-    # COMPRESSION
     compression_mask = (
             range_decay &
             (df['overlap_freq'] > 0.55) &
-            (df['impulse_freq'] < 0.25)  # ← KLUCZ
+            (df['impulse_freq'] < 0.25)
     )
 
-    # EXPANSION
     expansion_mask = (
             (df['impulse_freq'] > 0.45) &
             (
@@ -73,7 +71,6 @@ def detect_microstructure_regime(
             )
     )
 
-    # EXHAUSTION
     exhaustion_mask = (
             (df['atr_ratio'] > expansion_thr) &
             (df['impulse_freq'] < 0.25) &
@@ -105,13 +102,11 @@ def detect_microstructure_regime(
     )
 
     # =============================================================
-    # MICROSTRUCTURE FSM – SEKWENCJA STANÓW
+    # MICROSTRUCTURE FSM
     # =============================================================
 
-    # 1️⃣ Poprzedni stan mikrostruktury
     df['micro_prev'] = df['microstructure_regime'].shift(1)
 
-    # 2️⃣ Nazwa przejścia (sekcja deterministyczna)
     df['micro_transition'] = (
             df['micro_prev'].astype(str) +
             '_to_' +
@@ -119,15 +114,11 @@ def detect_microstructure_regime(
     )
 
     # =============================================================
-    # MICROSTRUCTURE BIAS – POPRAWNA SEMANTYKA
+    # MICROSTRUCTURE BIAS
     # =============================================================
 
     df['micro_bias'] = 'balanced'
 
-    # ==========================
-    # MOMENTUM FAVORABLE
-    # (KRÓTKIE OKNO PO TRANSITION)
-    # ==========================
     df.loc[
         df['micro_transition'].isin({
             'compression_to_expansion',
@@ -136,18 +127,11 @@ def detect_microstructure_regime(
         'micro_bias'
     ] = 'momentum_favorable'
 
-    # ==========================
-    # COUNTERTREND FAVORABLE
-    # (CAŁA FAZA EXHAUSTION)
-    # ==========================
     df.loc[
         df['microstructure_regime'] == 'exhaustion',
         'micro_bias'
     ] = 'countertrend_favorable'
 
-    # ==========================
-    # COUNTERTREND FAVORABLE
-    # ==========================
     COUNTERTREND_FAVORABLE = {
         'expansion_to_exhaustion',
     }
@@ -158,10 +142,9 @@ def detect_microstructure_regime(
     ] = 'countertrend_favorable'
 
     # =============================================================
-    # FSM PAMIĘĆ (STATE DURATION)
+    # FSM
     # =============================================================
 
-    # 3️⃣ Liczba barów w aktualnym micro_bias
     df['micro_bias_block'] = (
         df['micro_bias']
         .ne(df['micro_bias'].shift())
@@ -173,7 +156,6 @@ def detect_microstructure_regime(
             .cumcount() + 1
     )
 
-    # 4️⃣ Bary od ostatniego momentum_favorable
     df['bars_since_momentum'] = (
         df['micro_bias'].eq('momentum_favorable')
         .astype(int)
@@ -188,23 +170,19 @@ def detect_microstructure_regime(
         .groupby(df['micro_bias'].ne('countertrend_favorable').cumsum())
         .cumcount()
     )
-
     # =============================================================
-    # KONTEKSTY WYSOKIEGO POZIOMU (BEZ SYGNAŁÓW)
+    # CONTEXT
     # =============================================================
 
-    # 🚫 BLOK DLA MOMENTUM (late / chaos)
     df['block_momentum'] = (
             df['micro_bias'] == 'countertrend_favorable'
     )
 
-    # ✅ POZWOLENIE NA CONTINUATION
     df['allow_momentum'] = (
             (df['micro_bias'] == 'momentum_favorable') &
             (df['bars_in_micro_bias'] <= 3)
     )
 
-    # ⚠️ RYZYKOWNY KONTR-TRADE (fade / sweep)
     df['allow_countertrend'] = (
             (df['micro_bias'] == 'countertrend_favorable') &
             (df['bars_in_micro_bias'] <= 2)
@@ -215,10 +193,6 @@ def detect_microstructure_regime(
             (df['bars_in_micro_bias'] > 2) |
             (df['bars_since_flip'] < 4)
     )
-
-    # =============================================================
-    # (OPCJONALNE) PREMIUM CONTEXT
-    # =============================================================
 
     df['premium_context'] = (
             (df['micro_bias'] == 'momentum_favorable') &

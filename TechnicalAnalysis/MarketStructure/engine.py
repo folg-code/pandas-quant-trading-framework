@@ -25,6 +25,7 @@ class _Modules:
     structural_vol = PriceActionStructuralVolatilityBatched
     trend_regime = PriceActionTrendRegimeBatched
 
+
 class MarketStructureEngine:
     """
     Deterministic, dependency-aware market structure engine.
@@ -62,7 +63,7 @@ class MarketStructureEngine:
         out: dict[str, pd.Series] = {}
         context: dict[str, dict] = {}
 
-        M = _Modules  # alias
+        M = _Modules
 
         # =========================================================
         # 1️⃣ PIVOTS
@@ -101,7 +102,6 @@ class MarketStructureEngine:
                 ).apply(pivots=pivots)
             )
             context["fibo"] = fibo
-
 
         # =========================================================
         # 4️⃣ PRICE ACTION
