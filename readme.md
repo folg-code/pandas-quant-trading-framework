@@ -2,11 +2,6 @@
 
 A **modular, end-to-end quantitative research and execution framework** written in Python.
 
-This repository is **not focused on trading performance**, but on **software architecture, data pipelines, backtesting infrastructure, and live system design**.
-It is intended for **Python Developer / Engineer** and **Data / Quant Analyst** roles.
-
----
-
 ## What This Project Showcases
 
 ### Software Engineering
@@ -17,7 +12,7 @@ It is intended for **Python Developer / Engineer** and **Data / Quant Analyst** 
 - multiprocessing & performance optimization
 - stateful systems with crash-safe persistence
 
-### Data & Quant Engineering
+### Data  Engineering
 - vectorized time-series processing (`pandas`, `numpy`)
 - multi-timeframe data handling
 - bias-aware backtesting design
@@ -108,7 +103,6 @@ Supports:
 
 Designed for **correctness and realism**, not shortcuts:
 
-- candle-based execution using high/low simulation
 - partial exits
 - break-even logic
 - slippage modeling
@@ -190,22 +184,13 @@ Demonstrates **robust state handling in long-running systems**.
 
 **This is:**
 - a systems design project
-- a data engineering & quantitative research framework
+- a data engineering &  research framework
 - a demonstration of Python engineering skills
 
 **This is not:**
 - a commercial trading bot
 - a black-box ML system
 - a promise of trading profitability
-
----
-
-## Intended Audience
-
-- Python Developers / Engineers
-- Data Engineers
-- Quantitative / Research Engineers
-- Recruiters evaluating real-world system design
 
 ---
 
@@ -218,37 +203,211 @@ Any use in live markets is at the user's own risk.
 
 ## Roadmap / TODO
 
-The following items are **explicitly planned** and included to transparently communicate the project’s direction and technical depth:
-
-- **Full refactor of Technical Analysis modules**  
-  Focus on architecture cleanup and consistency, including:
-  - `PriceStructureZones`
-  - `Sessions`
-  
-  Goal: clearer module boundaries, improved testability, and removal of legacy coupling.  
-  **Status:** work in progress.
-
-- **Extended plotting and reporting layer**  
-  Planned improvements include:
-  - richer diagnostic charts
-  - deeper per-strategy and per-feature analytics
-  - exportable report formats (research-oriented, not marketing)
-
-- **Machine Learning–ready strategy framework**  
-  Preparation of the framework for ML-based strategies, with a focus on:
-  - tree-based models (e.g. decision trees, ensembles)
-  - strict separation between feature generation and model inference
-  - reuse of the same backtesting and execution pipeline
-
-These items are intentionally listed to highlight **forward-looking system design** rather than unfinished work.
+This roadmap defines the long-term development plan for the project.
+The order is intentional and optimized for:
+- fast feedback loops
+- minimal overengineering
+- controlled growth of system complexity
+- clear separation between research, analytics, execution, and infrastructure
 
 ---
 
-## Author Note
+## Phase 0 — Baseline Stabilization
+**Goal:** Establish a fixed reference point for all further work.
 
-The primary goal of this project is to demonstrate how I design and build:
-- modular Python systems
-- data-intensive pipelines
-- reproducible research environments
-- production-style execution engines
+- Finalize TechnicalAnalysis refactor, focusing on architecture cleanup
+- Freeze one strategy, one market, one timeframe
+- Define a fixed historical dataset
+- Create a baseline backtest result
+- Treat this result as the reference benchmark
+
+_No new features, or research in this phase._
+
+---
+
+## Phase 1 — Analytics & Reporting Foundation
+**Goal:** Build reusable analytical tools and frameworks that will later
+enable systematic, repeatable, and extensible quantitative research.
+
+
+- Feature expectancy & stability tooling  
+  - generic tools for expectancy / winrate vs feature quantiles  
+  - rolling performance and feature drift detectors  
+
+- Regime-aware backtesting tooling  
+  - reusable regime segmentation (trend / volatility / session)  
+  - backtest runners producing regime-split metrics and equity curves 
+  
+- Walk-forward & time-sliced validation tooling  
+  - configurable optimization / validation / test windows  
+  - robustness and performance decay scoring utilities 
+
+- R-distribution & trade contribution tooling  
+  - standardized R-distribution analytics  
+  - tail risk and trade contribution analyzers  
+
+- Backtest vs live (dry-run) consistency tooling  
+  - dataset alignment and metric comparison utilities  
+  - divergence detection with alerting hooks  
+
+---
+
+## Phase 2 — Feature Engineering (No ML)
+**Goal:** Identify informative and stable features.
+
+- Extract contextual features from the core engine:
+  - market structure
+  - trend regime
+  - volatility regime
+  - distance to key levels
+  - time-based features (session, bar index)
+- Analyze feature behavior:
+  - expectancy by quantiles
+  - stability across time
+  - redundancy and correlation
+- Remove weak, unstable, or redundant features
+- Build a final feature set (approximately 5–20 features)
+
+No machine learning is used in this phase.
+
+---
+
+## Phase 3 — Machine Learning (Decision Trees)
+**Goal:** Improve trade selection via probabilistic scoring.
+
+- Define ML targets (e.g. win/loss, R > threshold)
+- Train tree-based models:
+  - Random Forest
+  - XGBoost / LightGBM
+- Perform strict out-of-sample and walk-forward validation
+- Analyze feature importance and decision boundaries
+- Integrate ML as a scoring / filtering layer (not signal generation)
+- Discard ML if it does not improve robustness or equity behavior
+
+ML is used to strengthen edge, not to create it.
+
+---
+
+## Phase 4 — Market Research (Iterative)
+**Goal:** Systematically explore and validate new market hypotheses.
+
+- Formulate explicit hypotheses about price behavior
+- Translate hypotheses into measurable features
+- Validate ideas using the analytics layer
+- Discard ideas without measurable edge
+- Iterate only through data-driven feedback
+
+Research is always subordinate to analytics.
+
+---
+
+## Phase 5 — Execution Layer & Containerization
+**Goal:** Production-ready execution independent of Windows.
+
+- Implement execution adapter (cTrader Open API)
+- Add  risk and rule guards
+- Introduce Docker-based runtime for the engine
+- Support live and paper trading modes
+- Add execution health checks and fail-safe mechanisms
+
+Execution logic remains thin, deterministic, and broker-agnostic.
+
+---
+
+## Phase 6 — Runtime Control & Telegram Notifications
+**Goal:** Safe live operation and real-time supervision.
+
+### Strategy Runtime Control
+- Enable / disable strategies at runtime
+- Temporary pause / resume trading
+- Scheduled trading blackout windows (e.g. high-impact news)
+- Strategy reload without full system restart
+
+### Trade Operations
+- Manual trade close (full or partial)
+- Emergency close-all positions
+- Per-strategy and global kill switch
+
+### Telegram Notification System
+- Trade lifecycle notifications:
+  - trade opened
+  - trade closed
+  - execution errors
+- Risk alerts:
+  - daily drawdown thresholds
+  - max drawdown proximity
+- Strategy state changes:
+  - paused
+  - resumed
+  - disabled
+  - reloaded
+- Connectivity and execution health alerts
+- Configurable notification levels (info / warning / critical)
+
+Runtime control must be deterministic, auditable, and broker-agnostic.
+
+---
+
+## Phase 6.5 — Backtest vs Live Consistency Validation
+**Goal:** Detect execution drift and hidden performance degradation.
+
+- Align backtest, dry-run, and live trade datasets
+- Compare key metrics:
+  - trade count
+  - winrate
+  - expectancy
+  - R distribution
+  - drawdown profile
+- Detect missing or extra trades in live vs backtest
+- Analyze timing and slippage differences
+- Define acceptable deviation thresholds
+- Trigger Telegram alerts on significant divergence
+- Generate consistency comparison reports and plots
+
+This phase acts as an early warning system before scaling live trading.
+
+---
+
+## Phase 7 — Django Control Plane
+**Goal:** Operational usability and orchestration.
+
+- Django models:
+  - Strategy
+  - Backtest
+  - Trade
+  - Report
+  - RuntimeState
+- Asynchronous backtest manager
+- Dashboard for analytics, reports, and comparisons
+- GUI for:
+  - starting / stopping strategies
+  - pausing / resuming trading
+  - manual trade management
+  - triggering strategy reloads
+- compliance monitoring
+- Centralized Telegram notification configuration
+
+Django acts as a control plane, not a computation engine.
+
+---
+
+## Phase 8 — Advanced System Intelligence (Future)
+**Goal:** Improve robustness, scalability, and understanding.
+
+- Market regime taxonomy beyond trend/range
+- Multi-timeframe contextual intelligence
+- Dynamic risk and capital allocation
+- Explainability for ML-based decisions
+- Strategy A/B testing and experimentation framework
+- Strategy-as-configuration (DSL / YAML / JSON)
+- Stress testing:
+  - latency
+  - slippage
+  - spread shocks
+- Human-in-the-loop supervision workflows
+- Knowledge graph linking features, setups, regimes, and outcomes
+
+These enhancements follow only after a stable core is achieved.
+
+---
 
