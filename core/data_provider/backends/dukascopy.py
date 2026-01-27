@@ -38,7 +38,6 @@ class DukascopyBackend(MarketDataBackend):
         if start >= end:
             raise ValueError("start must be earlier than end")
 
-        # Dukascopy expects UTC
         start = start.tz_convert("UTC") if start.tzinfo else start.tz_localize("UTC")
         end = end.tz_convert("UTC") if end.tzinfo else end.tz_localize("UTC")
 
@@ -77,7 +76,6 @@ class DukascopyBackend(MarketDataBackend):
 
         df = df.copy()
 
-        # normalize column names
         df.columns = [c.lower() for c in df.columns]
 
         missing = required_columns - set(df.columns)
@@ -86,10 +84,8 @@ class DukascopyBackend(MarketDataBackend):
                 f"Dukascopy OHLCV missing columns: {missing}"
             )
 
-        # ensure time column
         df["time"] = pd.to_datetime(df["time"], utc=True)
 
-        # sort & deduplicate
         df = (
             df.sort_values("time")
             .drop_duplicates(subset="time", keep="last")

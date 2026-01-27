@@ -5,7 +5,7 @@ from datetime import timedelta
 LOOKBACK_CONFIG = {
     "M1":  "24h",
     "M5":  "7d",
-    "M15": "14d",   # sensowny default
+    "M15": "14d",
     "M30": "30d",
     "H1":  "60d",
     "H4":  "180d",
@@ -20,18 +20,17 @@ _UNIT_TO_DELTA = {
     "h": lambda n: timedelta(hours=n),
     "d": lambda n: timedelta(days=n),
     "w": lambda n: timedelta(weeks=n),
-    "m": lambda n: timedelta(days=30 * n),   # miesiąc ≈ 30 dni
-    "y": lambda n: timedelta(days=365 * n),  # rok ≈ 365 dni
+    "m": lambda n: timedelta(days=30 * n),
+    "y": lambda n: timedelta(days=365 * n),
 }
 
 
-def parse_lookback(lookback: str, *, now: pd.Timestamp | None = None) -> pd.Timestamp:
-    """
-    Zamienia np. '30d', '24h', '3y' na timestamp startowy (UTC).
+def parse_lookback(
+        lookback: str,
+        *,
+        now: pd.Timestamp | None = None
+) -> pd.Timestamp:
 
-    Zwraca:
-        pd.Timestamp (UTC)
-    """
     if now is None:
         now = pd.Timestamp.utcnow()
 

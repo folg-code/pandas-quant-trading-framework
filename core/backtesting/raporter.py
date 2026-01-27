@@ -1,11 +1,6 @@
 import os
 import contextlib
 from io import StringIO
-from datetime import timedelta
-import numpy as np
-import pandas as pd
-from rich.console import Console
-from rich.table import Table
 
 import pandas as pd
 from rich.console import Console
@@ -17,7 +12,12 @@ from config.backtest import BACKTEST_MODE
 
 class BacktestReporter:
 
-    def __init__(self, trades: pd.DataFrame, signals: pd.DataFrame, initial_balance: float):
+    def __init__(
+            self,
+            trades: pd.DataFrame,
+            signals: pd.DataFrame,
+            initial_balance: float
+    ):
         self.console = Console()
         self.trades = trades.copy()
         self.signals = signals
@@ -40,19 +40,15 @@ class BacktestReporter:
             if c not in self.trades.columns:
                 raise ValueError(f"Missing column in trades: {c}")
 
-        # safety
         self.trades["entry_tag"] = self.trades["entry_tag"].fillna("UNKNOWN")
         self.trades["exit_tag"] = self.trades["exit_tag"].fillna("UNKNOWN")
 
-
     def _compute_equity_curve(self):
-        # Sortowanie po czasie wyjścia
+
         self.trades = self.trades.sort_values(by="exit_time").reset_index(drop=True)
 
-        # Equity curve wektorowo
         self.trades["equity"] = self.initial_balance + self.trades["pnl_usd"].cumsum()
 
-        # Maksimum, minimum i drawdown
         self.trades["running_max"] = self.trades["equity"].cummax()
         self.trades["drawdown"] = self.trades["running_max"] - self.trades["equity"]
         self.max_balance = self.trades["equity"].max()
@@ -64,7 +60,6 @@ class BacktestReporter:
         if trades == 0:
             return None
 
-        # equity curve per tag
         equity = self.initial_balance + df["pnl_usd"].cumsum()
         running_max = equity.cummax()
         drawdown = (running_max - equity).max()
@@ -76,8 +71,6 @@ class BacktestReporter:
         avg_win = wins["pnl_usd"].mean() if not wins.empty else 0
         avg_loss = losses["pnl_usd"].mean() if not losses.empty else 0
         expectancy = win_rate * avg_win - (1 - win_rate) * abs(avg_loss)
-
-        # --- TP / SL logic ---
 
         def parse_exit_tag(tag: str):
             """
@@ -102,7 +95,6 @@ class BacktestReporter:
             if tag == "TIMEOUT":
                 return "TIMEOUT", None, "final"
 
-            # ---- legacy fallback ----
             if tag.startswith("SL") and len(parts) >= 2:
                 return "SL", parts[1], "final"
 
@@ -218,9 +210,7 @@ class BacktestReporter:
         table.add_column("Avg Losser", justify="right")
         table.add_column("Exp", justify="right")
 
-        # dodanie wierszy do tabeli
         for stats in stats_list:
-            # formatowanie avg_duration w HH:MM:SS
             avg_duration_str = str(pd.to_timedelta(stats["avg_duration"], unit='s')).split('.')[0]
 
             table.add_row(
@@ -268,7 +258,9 @@ class BacktestReporter:
         wins = t[t["pnl_usd"] > 0]
         losses = t[t["pnl_usd"] < 0]
 
-        profit_factor = wins["pnl_usd"].sum() / abs(losses["pnl_usd"].sum()) if not losses.empty else float("inf")
+        profit_factor = (
+            wins["pnl_usd"].sum() / abs(losses["pnl_usd"].sum())
+            if not losses.empty else float("inf"))
 
         expectancy = self._aggregate_trades(t)["exp"]
 
@@ -383,7 +375,8 @@ class BacktestReporter:
         """
 
         if "window" not in self.trades.columns:
-            self.console.print("⚠️ Split report requires 'window' column in trades.")
+            self.console.print(
+                "⚠️ Split report requires 'window' column in trades.")
             return
 
         self.console.rule(
@@ -617,7 +610,6 @@ class BacktestReporter:
 
             self.print_exit_reason_stats()
             self.print_symbol_report()
-
 
     def save(self, filename: str):
         os.makedirs(os.path.dirname(filename), exist_ok=True)

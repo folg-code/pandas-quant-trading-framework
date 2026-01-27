@@ -1,5 +1,3 @@
-# core/domain/exit_processor.py
-
 from core.domain.trade_exit import TradeExitResult
 from core.domain.execution import map_exit_code_to_reason
 

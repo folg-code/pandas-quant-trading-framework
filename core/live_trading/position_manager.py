@@ -42,7 +42,6 @@ class PositionManager:
 
         point_size = info.point
 
-        # Forex vs non-forex instruments
         if info.point < 0.01:
             ticks_per_pip = 0.0001 / info.point
         else:
@@ -64,10 +63,8 @@ class PositionManager:
         print("Min_vol:", min_vol)
         print("Max_vol:", max_vol)
 
-        # clamp
         volume = max(min_vol, min(volume, max_vol))
 
-        # round DOWN to step (broker-safe)
         steps = int(volume / step)
         normalized = round(steps * step, 2)
 
@@ -391,9 +388,6 @@ class PositionManager:
                     )
                 continue
 
-            # --- TRAILING / CUSTOM SL ---
-            #self._update_trailing_sl(trade_id, trade, market_state)
-
             # --- FINAL EXIT (SL / TP2 / TIMEOUT) ---
             exit_result = self._check_exit(trade, market_state)
             if exit_result is None:
@@ -416,15 +410,18 @@ class PositionManager:
         # Internal helpers
         # ==================================================
 
-    def _check_exit(self, trade: dict, market_state: dict) -> TradeExitResult | None:
+    def _check_exit(
+            self,
+            trade: dict,
+            market_state: dict
+    ) -> TradeExitResult | None:
+
         price = market_state["price"]
         now = market_state["time"]
 
         direction = trade["direction"]
         sl = trade["sl"]
-        tp1 = trade["tp1"]
         tp2 = trade["tp2"]
-        entry_price = trade["entry_price"]
 
         # --- SL ---
         if direction == "long" and price <= sl:
@@ -461,7 +458,11 @@ class PositionManager:
             return datetime.fromisoformat(t)
         return t
 
-    def _map_exit_level_tag(self, reason: TradeExitReason, trade: dict) -> str | None:
+    def _map_exit_level_tag(
+            self,
+            reason: TradeExitReason,
+            trade: dict
+    ) -> str | None:
         if reason is TradeExitReason.SL:
             return "SL_live"
         if reason is TradeExitReason.TP1:

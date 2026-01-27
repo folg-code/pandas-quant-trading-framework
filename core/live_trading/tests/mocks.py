@@ -1,5 +1,6 @@
 from datetime import datetime
 
+
 def market_data_provider_mock():
     return {
         "price": 1.1000,

@@ -6,16 +6,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from core.data_provider.backend_factory import create_backtest_backend
 from core.data_provider.default_provider import DefaultOhlcvDataProvider
 from core.data_provider.cache import MarketDataCache
-from core.data_provider.backends.dukascopy import DukascopyBackend
-from core.data_provider.backends.mt5 import Mt5Backend
 
 from core.backtesting.backtester import Backtester
 from core.backtesting.raporter import BacktestReporter
 from core.backtesting.plotting.plot import TradePlotter
 from core.strategy.runner import run_strategy_single
 from core.strategy.strategy_loader import load_strategy_class
-
-import config.backtest as cfg
 
 
 class BacktestRunner:
@@ -27,16 +23,15 @@ class BacktestRunner:
         self.signals_df = None
         self.trades_df = None
 
-
     # ==================================================
     # 1️⃣ LOAD DATA ONCE (FULL RANGE, MAIN TF)
     # ==================================================
+
     def load_data(self):
         backend = create_backtest_backend(self.config.BACKTEST_DATA_BACKEND)
 
         start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
         end = pd.Timestamp(self.config.TIMERANGE["end"], tz="UTC")
-
 
         self.provider = DefaultOhlcvDataProvider(
             backend=backend,
@@ -209,9 +204,6 @@ class BacktestRunner:
     # ==================================================
     # 7️⃣ MAIN RUN
     # ==================================================
-    # ==================================================
-    # 7️⃣ MAIN RUN
-    # ==================================================
     def run(self):
 
         print("🚀 Runner start")
@@ -243,4 +235,3 @@ class BacktestRunner:
         self.plot_results()
 
         print("🏁 Full run finished")
-

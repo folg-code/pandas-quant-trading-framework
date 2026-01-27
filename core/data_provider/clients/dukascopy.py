@@ -3,8 +3,6 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-from datetime import datetime
-from typing import Optional
 
 from core.data_provider.exceptions import DataNotAvailable
 
@@ -44,7 +42,6 @@ class DukascopyClient:
             raise ValueError("start must be earlier than end")
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            workdir = Path(tmpdir)
 
             csv_path = self._run_dukascopy_node(
                 symbol=symbol,
@@ -103,7 +100,6 @@ class DukascopyClient:
                 f"STDERR:\n{proc.stderr}"
             )
 
-        # 🔑 SZUKAMY CSV W download/
         csv_files = list(download_dir.glob("*.csv"))
 
         if not csv_files:
@@ -112,7 +108,6 @@ class DukascopyClient:
                 f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
             )
 
-        # jeśli więcej niż jeden — bierzemy największy (najczęściej pełny zakres)
         csv_path = max(csv_files, key=lambda p: p.stat().st_size)
 
         if csv_path.stat().st_size == 0:
@@ -168,7 +163,7 @@ class DukascopyClient:
 
         return out
 
-    def parse_dukascopy_time(self,series: pd.Series) -> pd.Series:
+    def parse_dukascopy_time(self, series: pd.Series) -> pd.Series:
         """
         Dukascopy may return:
         - ISO timestamps
@@ -194,7 +189,6 @@ class DukascopyClient:
 
         # fallback: string
         return pd.to_datetime(series, utc=True)
-
 
     @staticmethod
     def _to_utc(ts: pd.Timestamp) -> pd.Timestamp:

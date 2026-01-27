@@ -1,4 +1,3 @@
-from typing import Optional
 import numpy as np
 
 from core.domain.trade_exit import TradeExitResult

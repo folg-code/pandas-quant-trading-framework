@@ -1,10 +1,10 @@
-# core/domain/execution.py
 from core.domain.trade_exit import TradeExitReason
 
 EXIT_NONE = 0
 EXIT_SL = 1
 EXIT_TP2 = 3
 EXIT_EOD = 9
+
 
 def map_exit_code_to_reason(
     *,
@@ -29,9 +29,7 @@ def map_exit_code_to_reason(
     if exit_code == EXIT_EOD:
         return TradeExitReason.TIMEOUT
 
-    # BE logic is DOMAIN logic, not numba logic
     if tp1_executed and exit_price == entry_price:
         return TradeExitReason.BE
 
-    # fallback
     return TradeExitReason.UNKNOWN

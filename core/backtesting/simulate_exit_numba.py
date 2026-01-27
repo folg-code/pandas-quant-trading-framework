@@ -1,4 +1,3 @@
-import numpy as np
 from numba import njit
 
 
@@ -21,7 +20,7 @@ def simulate_exit_numba(
     low_arr,
     close_arr,
     time_arr,
-    slippage_abs,       # 👈 ABSOLUTE PRICE SLIPPAGE
+    slippage_abs,
 ):
     """
     Returns:
@@ -43,7 +42,6 @@ def simulate_exit_numba(
     for i in range(entry_pos + 1, n):
         high = high_arr[i]
         low = low_arr[i]
-        close = close_arr[i]
         t = time_arr[i]
 
         # -------------------------------------------------

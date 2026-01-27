@@ -1,4 +1,3 @@
-# core/domain/trade_exit.py
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime

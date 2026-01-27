@@ -1,5 +1,3 @@
-# core/domain/trade_factory.py
-
 from core.domain.trade_exit import TradeExitResult, TradeExitReason
 from core.domain.trade import Trade
 
@@ -27,9 +25,6 @@ class TradeFactory:
         Build Trade, apply exit result and return serialized dict.
         Backtester must not touch Trade internals.
         """
-
-        #print("LEVEL TAGS:", level_tags)
-        #print("EXIT REASON:", exit_result.reason)
 
         trade = Trade(
             symbol=symbol,
@@ -79,7 +74,6 @@ class TradeFactory:
             return level_tags.get("TP2")
 
         if reason is TradeExitReason.BE:
-            # BE is semantically derived from TP1
             return level_tags.get("TP1")
 
         return None

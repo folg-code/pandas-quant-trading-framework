@@ -21,6 +21,7 @@ def load_strategy(
         provider=provider
     )
 
+
 def load_strategy_class(name: str):
     """
     Zwraca klasę strategii BEZ tworzenia instancji.

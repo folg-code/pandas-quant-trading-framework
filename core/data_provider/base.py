@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 
-import mt5
 import pandas as pd
-
-import config
 
 
 class MarketDataProvider(ABC):
@@ -17,5 +14,3 @@ class MarketDataProvider(ABC):
         bars: int,
     ) -> pd.DataFrame:
         pass
-
-

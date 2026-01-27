@@ -62,6 +62,7 @@ class TradePlan:
     strategy_name: str
     strategy_config: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass(frozen=True)
 class TradeAction:
     """
@@ -72,9 +73,9 @@ class TradeAction:
     """
 
     action: Literal[
-        "move_sl",        # move stop loss to given level
-        "close",          # close entire position
-        "partial_close",  # close part of position
+        "move_sl",
+        "close",
+        "partial_close",
     ]
 
     value: Optional[float] = None

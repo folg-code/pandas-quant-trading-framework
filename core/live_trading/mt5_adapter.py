@@ -23,7 +23,6 @@ class MT5Adapter:
             print("⚠ MT5Adapter running in DRY-RUN mode")
             return
 
-        # ❗ NIE initialize MT5 tutaj
         if not mt5.terminal_info():
             raise RuntimeError("MT5 terminal not initialized")
 
@@ -39,7 +38,7 @@ class MT5Adapter:
             symbol: str,
             direction: str,
             volume: float,
-            price: float,  # entry_price from signal (informational)
+            price: float,
             sl: float,
             tp: float | None = None,
     ) -> Dict[str, Any]:
