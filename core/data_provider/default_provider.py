@@ -19,9 +19,6 @@ def validate_request(*, start, end, lookback):
         )
 
 
-import pandas as pd
-
-
 class DefaultOhlcvDataProvider:
     """
     BACKTEST OHLCV provider.
@@ -211,6 +208,7 @@ class DefaultOhlcvDataProvider:
         )
 
         return df.copy()
+
 
 def shift_time_by_candles(
     *,

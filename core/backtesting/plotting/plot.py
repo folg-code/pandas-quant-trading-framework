@@ -1,6 +1,5 @@
 import plotly.graph_objects as go
 import pandas as pd
-import matplotlib.pyplot as plt
 from plotly.subplots import make_subplots
 import os
 
@@ -40,11 +39,10 @@ class TradePlotter:
             "manual_exit": False,
         }
 
-
-
     # -------------------------------------------------
     # PUBLIC API
     # -------------------------------------------------
+
     def plot(self):
         self._add_candles()
         self._add_pivots()
@@ -224,7 +222,7 @@ class TradePlotter:
             self._legend_flags["Entry"] = True
 
             # =========================
-            # TP1 (jeśli istnieje)
+            # TP1
             # =========================
             has_tp1 = pd.notna(t.get("tp1_time")) and pd.notna(t.get("tp1_price"))
 
@@ -374,10 +372,6 @@ class TradePlotter:
                 col=1,
             )
 
-    def _add_pivots(self):
-        if "pivot_15" not in self.df.columns:
-            return
-        # (tu możesz wkleić swoją logikę pivotów praktycznie 1:1)
 
     def _layout(self):
         self.fig.update_layout(

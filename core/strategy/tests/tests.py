@@ -1,6 +1,10 @@
 import pandas as pd
 import pytest
-from core.strategy.BaseStrategy import BaseStrategy, FixedExitPlan, ManagedExitPlan
+from core.strategy.BaseStrategy import (
+    BaseStrategy,
+    FixedExitPlan,
+    ManagedExitPlan
+)
 from core.strategy.exception import StrategyConfigError
 
 
@@ -27,6 +31,7 @@ def test_fixed_exit_plan():
 
     assert isinstance(plan.exit_plan, FixedExitPlan)
 
+
 def test_managed_exit_by_trailing():
     row = pd.Series({
         "signal_entry": {"direction": "long", "tag": "test"},
@@ -49,6 +54,7 @@ def test_managed_exit_by_trailing():
     plan = strat.build_trade_plan(row=row)
 
     assert isinstance(plan.exit_plan, ManagedExitPlan)
+
 
 def test_managed_exit_by_signal_exit():
     row = pd.Series({

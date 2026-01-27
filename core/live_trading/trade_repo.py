@@ -87,8 +87,6 @@ class TradeRepo:
         """
         return self._load_json(self.closed_path)
 
-
-
     # ==================================================
     # Recording actions
     # ==================================================

@@ -1,7 +1,3 @@
-
-import pandas as pd
-from typing import Optional
-
 from core.strategy.BaseStrategy import BaseStrategy, TradePlan
 
 
@@ -38,4 +34,3 @@ class LiveStrategyAdapter:
 
         last_row = df.iloc[-1]
         return self.strategy.build_trade_plan(row=last_row)
-

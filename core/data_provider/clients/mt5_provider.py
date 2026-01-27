@@ -1,7 +1,6 @@
 import pandas as pd
 import MetaTrader5 as mt5
 
-import config
 from core.data_provider.base import MarketDataProvider
 from core.utils.lookback import LOOKBACK_CONFIG
 from core.utils.timeframe import MT5_TIMEFRAME_MAP
@@ -93,5 +92,4 @@ def lookback_to_bars(timeframe: str, lookback: str) -> int:
 
     # 🔒 minimum bezpieczeństwa
     return max(int(bars), 10)
-
 

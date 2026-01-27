@@ -1,7 +1,6 @@
 import traceback
-from typing import List, Optional
+from typing import  Optional
 import pandas as pd
-import config
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 
@@ -21,8 +20,8 @@ INSTRUMENT_META = {
         "pip_value": 1.0,
     },
     "USTECH100": {
-        "point": 0.01,          # lub 0.1 – zależnie od brokera
-        "pip_value": 1.0,         # wartość punktu
+        "point": 0.01,
+        "pip_value": 1.0,
         "contract_size": 1,
     }
 
@@ -30,15 +29,16 @@ INSTRUMENT_META = {
 
 
 class Backtester:
-    """Backtester dla wielu symboli."""
 
     def __init__(self, slippage: float = 0.0):
         self.slippage = slippage
 
+    def run_backtest(
+            self,
+            df: pd.DataFrame,
+            symbol: Optional[str] = None
+    ) -> pd.DataFrame:
 
-
-    def run_backtest(self, df: pd.DataFrame, symbol: Optional[str] = None) -> pd.DataFrame:
-        """Backtest dla jednego symbolu lub wielu symboli."""
         if symbol:
             return self._backtest_single_symbol(df, symbol)
 
@@ -47,7 +47,10 @@ class Backtester:
             trades = self._backtest_single_symbol(group_df, sym)
             all_trades.append(trades)
 
-        return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
+        return (
+            pd.concat(all_trades).sort_values(by='exit_time')
+            if all_trades else pd.DataFrame()
+        )
 
     def _backtest_single_symbol(self, df, symbol):
         trades = []
@@ -99,10 +102,7 @@ class Backtester:
                     "TP2": (levels.get("TP2") or levels.get(2))["tag"],
                 }
 
-
-
                 entry_price = close_arr[entry_pos]
-
 
                 slippage_abs = SLIPPAGE * point_size
                 entry_price += slippage_abs if direction == "long" else -slippage_abs
@@ -175,13 +175,10 @@ class Backtester:
 
         print(f"✅ Finished backtest for {symbol}, {len(trades)} trades.")
 
-
-
-
         return pd.DataFrame(trades)
 
     def run(self) -> pd.DataFrame:
-        """Uruchamia backtest. Jeśli symbol=None, robi go równolegle po wszystkich symbolach."""
+
         if self.symbol is not None:
             return self._backtest_single_symbol(self.df, self.symbol)
 
@@ -189,7 +186,13 @@ class Backtester:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
             futures = []
             for sym, group_df in self.df.groupby('symbol'):
-                futures.append(executor.submit(self._backtest_single_symbol, group_df.copy(), sym))
+                futures.append(
+                    executor.submit(
+                        self._backtest_single_symbol,
+                        group_df.copy(), sym
+                    )
+                )
+
             for future in as_completed(futures):
                 try:
                     trades = future.result()
@@ -198,5 +201,6 @@ class Backtester:
                     print(f"❌ Błąd w backteście: {e}")
                     traceback.print_exc()
 
-        return pd.concat(all_trades).sort_values(by='exit_time') if all_trades else pd.DataFrame()
-
+        return (
+            pd.concat(all_trades).sort_values(by='exit_time')
+            if all_trades else pd.DataFrame())
