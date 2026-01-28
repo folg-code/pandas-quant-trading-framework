@@ -1,5 +1,7 @@
 from core.backtesting.reporting.core.aggregration import ContextualAggregator
 from core.backtesting.reporting.core.base import BaseReport
+from core.backtesting.reporting.core.context import ReportContext
+from core.backtesting.reporting.core.section import ReportSection
 
 
 class RiskMonitoringReport(BaseReport):
@@ -30,3 +32,14 @@ class RiskMonitoringReport(BaseReport):
             )
 
         return report
+
+
+class RiskReport:
+    def __init__(self, sections: list[ReportSection]):
+        self.sections = sections
+
+    def compute(self, ctx: ReportContext) -> dict:
+        return {
+            section.name: section.compute(ctx)
+            for section in self.sections
+        }
