@@ -246,7 +246,8 @@ class BacktestRunner:
         # 3️⃣ RUN REPORT (PURE)
         ReportRunner(
             strategy=self.strategy,
-            trades_df=prepared_df
+            trades_df=prepared_df,
+            config=self.config
         ).run()
 
     # ==================================================

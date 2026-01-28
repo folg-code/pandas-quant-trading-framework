@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Set
+from typing import Optional, Set, Any
 
 import pandas as pd
 
@@ -17,5 +17,5 @@ class ReportContext:
     trades: pd.DataFrame
     equity: pd.Series
     df_plot: pd.DataFrame
-    config: BacktestConfig
-    strategy: BaseStrategy
+    config: Any
+    strategy: Any
