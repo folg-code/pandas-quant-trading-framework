@@ -94,7 +94,12 @@ class StdoutRenderer:
             self._render_tag_table(payload)
 
         elif name == "Drawdown Structure & Failure Modes":
+
             self._render_drawdown_section(payload)
+
+        elif name == "Capital & Exposure Analysis":
+
+            self._render_capital_exposure_section(payload)
 
         # --- Conditional multi-tables ---
         elif name in {
@@ -157,6 +162,58 @@ class StdoutRenderer:
     # ==================================================
     # CONDITIONAL TABLES RENDERER
     # ==================================================
+
+    def _render_capital_exposure_section(self, payload: dict):
+
+        # ==========================
+        # SUMMARY
+        # ==========================
+        summary = payload.get("Summary", {})
+        if summary:
+            self.console.print("\n[bold]Summary[/bold]")
+            for k, v in summary.items():
+                self.console.print(f"{k}: {self._fmt(v)}")
+
+        # ==========================
+        # OVERTRADING TABLE
+        # ==========================
+        over = payload.get("Overtrading diagnostics")
+        if not over:
+            return
+
+        rows = over.get("rows", [])
+        if not rows:
+            return
+
+        self.console.print("\n[bold]Overtrading diagnostics[/bold]")
+
+        table = Table(
+            show_header=True,
+            header_style="bold magenta",
+            box=None,
+            show_lines=False
+        )
+
+        raw_columns = list(rows[0].keys())
+        columns = [
+            TAG_TABLE_COLUMN_ALIASES.get(col, col)
+            for col in raw_columns
+        ]
+
+        for col in columns:
+            table.add_column(col, justify="right", no_wrap=True)
+
+        for row in rows:
+            table.add_row(
+                *[self._fmt(row[col]) for col in raw_columns]
+            )
+
+        self.console.print(table)
+
+        sorted_by = over.get("sorted_by")
+        if sorted_by:
+            alias = TAG_TABLE_COLUMN_ALIASES.get(sorted_by, sorted_by)
+            self.console.print(f"[italic]Sorted by: {alias}[/italic]")
 
     def _render_drawdown_section(self, payload: dict):
 

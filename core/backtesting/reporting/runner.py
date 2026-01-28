@@ -1,6 +1,7 @@
 from core.backtesting.reporting.core.context import ReportContext
 from core.backtesting.reporting.core.equity import EquityPreparer
 from core.backtesting.reporting.core.sections.backtest_config import BacktestConfigSection
+from core.backtesting.reporting.core.sections.capital_exposure import CapitalExposureSection
 from core.backtesting.reporting.core.sections.conditional_entry_tag import ConditionalEntryTagPerformanceSection
 from core.backtesting.reporting.core.sections.conditional_expectancy import ConditionalExpectancySection
 from core.backtesting.reporting.core.sections.core_performance import CorePerformanceSection
@@ -67,6 +68,7 @@ class ReportRunner:
                 ConditionalEntryTagPerformanceSection(),
                 ExitLogicDiagnosticsSection(),
                 DrawdownStructureSection(),
+                CapitalExposureSection(),
 
             ]
         )
