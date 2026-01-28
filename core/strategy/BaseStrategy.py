@@ -373,6 +373,9 @@ class BaseStrategy:
 
     def _finalize(self):
         self.df_plot = self.df.copy()
+
+
+
         self.df_backtest = self.df[self.REQUIRED_COLUMNS].copy()
 
     def _collect_informatives(self):

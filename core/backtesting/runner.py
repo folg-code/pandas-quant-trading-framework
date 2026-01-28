@@ -4,6 +4,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 
+from config.backtest import INITIAL_BALANCE
+from core.backtesting.reporting.core.contex_enricher import TradeContextEnricher
+from core.backtesting.reporting.core.preparer import RiskDataPreparer
 from core.backtesting.reporting.runner import ReportRunner
 from core.data_provider.backend_factory import create_backtest_backend
 from core.data_provider.default_provider import DefaultOhlcvDataProvider
@@ -213,12 +216,37 @@ class BacktestRunner:
 
     def run_report(self):
 
-        if self.strategy is None:
-            raise RuntimeError("No strategy instance available for reporting")
+        # 1️⃣ PREPARE RISK STATE
+        preparer = RiskDataPreparer(
+            initial_balance=INITIAL_BALANCE
+        )
+        prepared_df = preparer.prepare(self.trades_df)
 
+        # 2️⃣ ENRICH CONTEXTS (CANDLE → TRADE)
+        enricher = TradeContextEnricher(self.strategy.df_plot)
+        prepared_df = enricher.enrich(
+            prepared_df,
+            self.strategy.report_config.contexts
+        )
+
+        print(prepared_df.columns.tolist())
+
+        print(
+            prepared_df["bos_bear_struct_vol"]
+            .value_counts(dropna=False)
+            .head()
+        )
+
+        print(
+            prepared_df["trend_regime"]
+            .value_counts(dropna=False)
+            .head()
+        )
+
+        # 3️⃣ RUN REPORT (PURE)
         ReportRunner(
-            strategy=self.strategy,     # ✅ SINGLE INSTANCE
-            trades_df=self.trades_df
+            strategy=self.strategy,
+            trades_df=prepared_df
         ).run()
 
     # ==================================================

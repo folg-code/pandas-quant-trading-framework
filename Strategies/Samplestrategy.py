@@ -3,6 +3,7 @@ import talib.abstract as ta
 
 from Strategies.utils.decorators import informative
 from core.backtesting.reporting.core.context import ContextSpec
+from core.backtesting.reporting.core.metrics import ExpectancyMetric, MaxDrawdownMetric
 from core.strategy.BaseStrategy import BaseStrategy
 from TechnicalAnalysis.MarketStructure.engine import MarketStructureEngine
 
@@ -83,6 +84,7 @@ class Samplestrategy(BaseStrategy):
     def populate_entry_trend(self):
 
         df = self.df.copy()
+
 
 
 
@@ -198,13 +200,18 @@ class Samplestrategy(BaseStrategy):
             axis=1
         )
 
+
         self.df = df
+
+
         return df
 
     def build_report_config(self):
         return (
             super()
             .build_report_config()
+            .add_metric(ExpectancyMetric())
+            .add_metric(MaxDrawdownMetric())
             .add_context(
                 ContextSpec(
                     name="bos_bear_struct_vol",
