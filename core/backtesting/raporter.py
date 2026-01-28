@@ -256,7 +256,20 @@ class BacktestReporter:
         final_balance = t["equity"].iloc[-1]
         absolute_profit = final_balance - self.initial_balance
         total_profit_pct = (final_balance / self.initial_balance - 1) * 100
-        cagr = ((final_balance / self.initial_balance) ** (365 / days) - 1) * 100
+
+        print(
+            "CAGR DEBUG |",
+            "initial_balance =", self.initial_balance,
+            "final_balance =", final_balance,
+            "days =", days,
+        )
+
+        if final_balance <= 0:
+            cagr = -100.0
+        else:
+            cagr = ((final_balance / self.initial_balance) ** (365 / days) - 1) * 100
+
+
 
         daily_returns = t.groupby(t["exit_time"].dt.date)["pnl_usd"].sum()
         max_daily_loss = daily_returns.min()
