@@ -1,3 +1,4 @@
+from config.backtest import INITIAL_BALANCE
 from core.backtesting.reporting.core.context import ReportContext
 from core.backtesting.reporting.core.equity import EquityPreparer
 from core.backtesting.reporting.core.sections.backtest_config import BacktestConfigSection
@@ -49,6 +50,7 @@ class ReportRunner:
             equity=equity,
             drawdown=drawdown,
             df_plot=self.strategy.df_plot,
+            initial_balance=INITIAL_BALANCE,
             config=self.config,
             strategy=self.strategy,
         )

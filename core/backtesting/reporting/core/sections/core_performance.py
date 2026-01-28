@@ -20,6 +20,7 @@ class CorePerformanceSection(ReportSection):
         trades = ctx.trades
         equity = trades["equity"]
 
+
         initial_balance = ctx.initial_balance
         final_balance = equity.iloc[-1]
 

@@ -108,6 +108,9 @@ class StdoutRenderer:
         elif name == "Core Performance Metrics":
             self._render_metric_table(payload)
 
+        elif name == "Trade Distribution & Payoff Geometry":
+            self._render_trade_distribution_section(payload)
+
         else:
             # temporary fallback for sections not yet migrated
             self.console.print(Pretty(payload, expand_all=True))
@@ -144,6 +147,36 @@ class StdoutRenderer:
     # ==================================================
     # OTHER RENDERERS
     # ==================================================
+
+    def _render_trade_distribution_section(self, payload: dict):
+
+        for title, block in payload.items():
+            rows = block.get("rows", [])
+            if not rows:
+                continue
+
+            percent_columns = block.get("percent_columns", set())
+
+            self.console.print(f"\n[bold]{title}[/bold]")
+
+            table = Table(box=None, show_header=True)
+            columns = list(rows[0].keys())
+
+            for col in columns:
+                table.add_column(col, justify="right", no_wrap=True)
+
+            for row in rows:
+                table.add_row(
+                    *[
+                        self._fmt(
+                            row[col],
+                            pct=col in percent_columns
+                        )
+                        for col in columns
+                    ]
+                )
+
+            self.console.print(table)
 
     def _render_metric_table(self, payload: dict):
         """
@@ -256,15 +289,16 @@ class StdoutRenderer:
     # GLOBAL FORMATTER (SINGLE SOURCE OF TRUTH)
     # ==================================================
 
-    def _fmt(self, value) -> str:
-        if value is None:
+    def _fmt(self, v, *, pct: bool = False):
+        if v is None:
             return "-"
 
-        # numpy → python
-        if hasattr(value, "item"):
-            value = value.item()
+        if isinstance(v, float):
+            if pct:
+                return f"{v * 100:,.2f}%"
+            return f"{v:,.4f}"
 
-        if isinstance(value, (int, float)):
-            return f"{value:,.2f}"
+        if isinstance(v, int):
+            return f"{v:,d}"
 
-        return str(value)
+        return str(v)

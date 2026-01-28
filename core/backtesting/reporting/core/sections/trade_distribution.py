@@ -13,63 +13,51 @@ class TradeDistributionSection(ReportSection):
 
     name = "Trade Distribution & Payoff Geometry"
 
-    def compute(self, ctx: ReportContext) -> Dict[str, Any]:
-        trades = ctx.trades
+    def compute(self, ctx: ReportContext) -> dict:
 
-        if trades.empty:
-            return {"error": "No trades available"}
-
-        r = self._compute_r_multiples(trades)
-
-        buckets = self._bucketize_r(r)
-
-        return {
-            "R-multiple distribution": buckets,
-            "Summary": {
-                "Trades count": int(len(r)),
-                "Mean R": float(np.mean(r)),
-                "Median R": float(np.median(r)),
-                "Positive R %": float((r > 0).mean()),
-                "Negative R %": float((r < 0).mean()),
-            }
-        }
-
-    # ==================================================
-    # Helpers
-    # ==================================================
-
-    def _compute_r_multiples(self, trades):
-        """
-        Computes R-multiple per trade.
-        Requires column 'returns' OR risk proxy via abs(loss).
-        """
-
-        if "returns" in trades.columns:
-            return trades["returns"].astype(float)
-
-        # fallback: pnl normalized by average loss
-        losses = trades.loc[trades["pnl_usd"] < 0, "pnl_usd"].abs()
-
-        if losses.empty:
-            return np.zeros(len(trades))
-
-        avg_loss = losses.mean()
-        return trades["pnl_usd"] / avg_loss
-
-    def _bucketize_r(self, r):
-        """
-        Buckets R-multiples into standard payoff geometry bins.
-        """
+        trades = ctx.trades.copy()
+        r = trades["returns"]  # R-multiple
 
         total = len(r)
 
-        def pct(mask):
-            return float(mask.sum() / total) if total else 0.0
+        # ------------------------------
+        # R-multiple buckets
+        # ------------------------------
+        buckets = {
+            "< -1R": (r < -1),
+            "-1R to 0": ((r >= -1) & (r < 0)),
+            "0 to +1R": ((r >= 0) & (r < 1)),
+            "+1R to +2R": ((r >= 1) & (r < 2)),
+            "> +2R": (r >= 2),
+        }
+
+        distribution_rows = []
+        for label, mask in buckets.items():
+            count = mask.sum()
+            distribution_rows.append({
+                "Bucket": label,
+                "Trades": int(count),
+                "Share (%)": count / total if total else 0.0,
+            })
+
+        # ------------------------------
+        # Summary stats
+        # ------------------------------
+        summary_rows = [
+            {"Metric": "Trades count", "Value": total},
+            {"Metric": "Mean R", "Value": r.mean()},
+            {"Metric": "Median R", "Value": r.median()},
+            {"Metric": "Positive R (%)", "Value": (r > 0).mean()},
+            {"Metric": "Negative R (%)", "Value": (r < 0).mean()},
+        ]
 
         return {
-            "< -1R": pct(r < -1),
-            "-1R to 0": pct((r >= -1) & (r < 0)),
-            "0 to +1R": pct((r >= 0) & (r < 1)),
-            "+1R to +2R": pct((r >= 1) & (r < 2)),
-            "> +2R": pct(r >= 2),
+            "R-multiple distribution": {
+                "rows": distribution_rows,
+                "percent_columns": {"Share (%)"},
+            },
+            "Summary": {
+                "rows": summary_rows,
+                "percent_columns": {"Positive R (%)", "Negative R (%)"},
+            },
         }

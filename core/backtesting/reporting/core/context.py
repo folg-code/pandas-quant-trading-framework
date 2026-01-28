@@ -18,5 +18,6 @@ class ReportContext:
     equity: pd.Series | None
     drawdown: pd.Series | None
     df_plot: pd.DataFrame
+    initial_balance: float
     config: Any
     strategy: Any
