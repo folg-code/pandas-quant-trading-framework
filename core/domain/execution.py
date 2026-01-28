@@ -2,6 +2,7 @@ from core.domain.trade_exit import TradeExitReason
 
 EXIT_NONE = 0
 EXIT_SL = 1
+EXIT_TP1_BE = 2
 EXIT_TP2 = 3
 EXIT_EOD = 9
 
@@ -23,13 +24,14 @@ def map_exit_code_to_reason(
     if exit_code == EXIT_SL:
         return TradeExitReason.SL
 
+    if exit_code == EXIT_TP1_BE:
+        return TradeExitReason.BE
+
     if exit_code == EXIT_TP2:
         return TradeExitReason.TP2
 
     if exit_code == EXIT_EOD:
         return TradeExitReason.TIMEOUT
 
-    if tp1_executed and exit_price == entry_price:
-        return TradeExitReason.BE
 
     return TradeExitReason.UNKNOWN

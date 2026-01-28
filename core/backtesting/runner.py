@@ -1,4 +1,6 @@
 import os
+from time import perf_counter
+
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -28,6 +30,7 @@ class BacktestRunner:
     # ==================================================
 
     def load_data(self):
+
         backend = create_backtest_backend(self.config.BACKTEST_DATA_BACKEND)
 
         start = pd.Timestamp(self.config.TIMERANGE["start"], tz="UTC")
@@ -206,32 +209,59 @@ class BacktestRunner:
     # ==================================================
     def run(self):
 
+        t_start = perf_counter()
         print("🚀 Runner start")
 
+        # ============================
+        # LOAD DATA
+        # ============================
+        t = perf_counter()
         all_data = self.load_data()
+        print(f"⏱ load_data            {perf_counter() - t:.3f}s")
+
+        # ============================
+        # STRATEGIES (PARALLEL)
+        # ============================
+        t = perf_counter()
         self.run_strategies_parallel(all_data)
+        print(f"⏱ run_strategies       {perf_counter() - t:.3f}s")
 
         # ============================
         # PLOT ONLY
         # ============================
         if self.config.PLOT_ONLY:
+            t = perf_counter()
             self.plot_results()
-            print("📊 Plot-only finished")
+            print(f"⏱ plot_results         {perf_counter() - t:.3f}s")
+            print(f"📊 Plot-only finished   TOTAL {perf_counter() - t_start:.3f}s")
             return
 
         # ============================
         # BACKTEST
         # ============================
+        t = perf_counter()
         self.run_backtests()
+        print(f"⏱ run_backtests        {perf_counter() - t:.3f}s")
 
         if self.config.BACKTEST_MODE == "backtest":
-            print("🧪 Backtest finished (no report / plot)")
+            print(f"🧪 Backtest finished    TOTAL {perf_counter() - t_start:.3f}s")
             return
 
         # ============================
-        # FULL PIPELINE
+        # REPORT
         # ============================
+        t = perf_counter()
         self.run_report()
-        self.plot_results()
+        print(f"⏱ run_report           {perf_counter() - t:.3f}s")
 
-        print("🏁 Full run finished")
+        # ============================
+        # FINAL PLOT
+        # ============================
+        t = perf_counter()
+        self.plot_results()
+        print(f"⏱ plot_results         {perf_counter() - t:.3f}s")
+
+        # ============================
+        # TOTAL
+        # ============================
+        print(f"🏁 Full run finished    TOTAL {perf_counter() - t_start:.3f}s")

@@ -59,7 +59,10 @@ def simulate_exit_numba(
 
             # SL HIT
             if low <= sl:
-                exit_code = EXIT_SL
+                if tp1_executed:
+                    exit_code = EXIT_TP1_BE
+                else:
+                    exit_code = EXIT_SL
                 exit_price = sl - slippage_abs
                 return exit_price, t, exit_code, tp1_executed, tp1_price, tp1_time
 
@@ -78,7 +81,10 @@ def simulate_exit_numba(
 
             # SL HIT
             if high >= sl:
-                exit_code = EXIT_SL
+                if tp1_executed:
+                    exit_code = EXIT_TP1_BE
+                else:
+                    exit_code = EXIT_SL
                 exit_price = sl + slippage_abs
                 return exit_price, t, exit_code, tp1_executed, tp1_price, tp1_time
 

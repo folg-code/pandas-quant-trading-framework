@@ -250,6 +250,15 @@ class BaseStrategy:
     def populate_exit_trend(self):
         raise NotImplementedError
 
+    def get_bullish_zones(self):
+        return []
+    def get_bearish_zones(self):
+        return []
+    def get_extra_values_to_plot(self):
+        return []
+    def bool_series(self):
+        return []
+
     # ==================================================
     # Lifecycle
     # ==================================================
@@ -260,6 +269,12 @@ class BaseStrategy:
         self._run_step("populate_indicators", self.populate_indicators)
         self._run_step("populate_entry_trend", self.populate_entry_trend)
         self._run_step("populate_exit_trend", self.populate_exit_trend)
+
+        self.get_bullish_zones()
+        self.get_bearish_zones()
+        self.get_extra_values_to_plot()
+        self.bool_series()
+
         self._finalize()
         return self.df_backtest
 

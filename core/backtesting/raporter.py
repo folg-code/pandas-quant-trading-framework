@@ -43,6 +43,19 @@ class BacktestReporter:
         self.trades["entry_tag"] = self.trades["entry_tag"].fillna("UNKNOWN")
         self.trades["exit_tag"] = self.trades["exit_tag"].fillna("UNKNOWN")
 
+        def compose_exit_tag(row):
+            reason = row["exit_tag"]
+            level = row["exit_level_tag"]
+
+            if not isinstance(level, str) or level == "":
+                return reason
+
+            return f"{reason}_{level}"
+
+        self.trades["exit_tag_full"] = self.trades.apply(
+            compose_exit_tag, axis=1
+        )
+
     def _compute_equity_curve(self):
 
         self.trades = self.trades.sort_values(by="exit_time").reset_index(drop=True)
@@ -342,7 +355,7 @@ class BacktestReporter:
         self.console.print(table)
 
     def print_exit_reason_stats(self):
-        self._print_group_table("EXIT REASON STATS", "exit_tag", self.trades)
+        self._print_group_table("EXIT REASON STATS", "exit_tag_full", self.trades)
 
     def print_tp1_entry_stats(self):
         df = self.trades[self.trades['tp1_price'].notna()]
