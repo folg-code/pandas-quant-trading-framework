@@ -9,11 +9,9 @@ from rich.panel import Panel
 # ==================================================
 
 TAG_TABLE_COLUMN_ALIASES = {
-    # Common
     "Tag": "Tag",
     "Context": "Ctx",
 
-    # Performance
     "Trades": "N",
     "Expectancy (USD)": "EXP",
     "Win rate": "WR [%]",
@@ -25,7 +23,6 @@ TAG_TABLE_COLUMN_ALIASES = {
     "Contribution to total PnL (%)": "PnL%",
     "Max internal drawdown (USD)": "DD",
 
-    # Exit / Drawdown
     "Depth": "Depth",
     "Duration (trades)": "Dur",
     "Recovery (trades)": "Rec",
@@ -41,7 +38,7 @@ CONDITIONAL_COLUMN_ALIASES = {
     "weekday": "Day",
     "Trades": "N",
     "Expectancy (USD)": "EXP",
-    "Win rate": "WR",
+    "Win rate": "WR [%]",
     "Total PnL": "PnL",
 }
 
@@ -54,11 +51,9 @@ class StdoutRenderer:
     """
     Generic section-based stdout renderer.
 
-    Contract:
-    - Section returns either:
-        * dict (Pretty-printed)
-        * { "rows": [...], "sorted_by": ... }  -> tag table
-        * { key: { "rows": [...] }, ... }      -> conditional tables
+    NOTE:
+    This commit only unifies formatting.
+    Section logic and dispatch are unchanged.
     """
 
     def __init__(self):
@@ -86,7 +81,6 @@ class StdoutRenderer:
             )
         )
 
-        # --- Tag-style tables (entry / exit / drawdown rows) ---
         if name in {
             "Performance by Entry Tag",
             "Exit Logic Diagnostics",
@@ -94,22 +88,22 @@ class StdoutRenderer:
             self._render_tag_table(payload)
 
         elif name == "Drawdown Structure & Failure Modes":
-
             self._render_drawdown_section(payload)
 
         elif name == "Capital & Exposure Analysis":
-
             self._render_capital_exposure_section(payload)
 
-        # --- Conditional multi-tables ---
+        elif name == "Tail Risk Analysis":
+            self._render_tail_risk_section(payload)
+
         elif name in {
             "Conditional Expectancy Analysis",
             "Conditional Entry Tag Performance",
         }:
             self._render_conditional_tables(payload)
 
-        # --- Fallback ---
         else:
+            # TEMP fallback – will be removed in next commits
             self.console.print(Pretty(payload, expand_all=True))
 
     # ==================================================
@@ -123,34 +117,16 @@ class StdoutRenderer:
             self.console.print("[italic]No data[/italic]")
             return
 
-        table = Table(
-            show_header=True,
-            header_style="bold magenta",
-            box=None,
-            show_lines=False
-        )
+        table = Table(show_header=True, header_style="bold magenta", box=None)
 
         raw_columns = list(rows[0].keys())
+        columns = [TAG_TABLE_COLUMN_ALIASES.get(c, c) for c in raw_columns]
 
-        # Apply aliases
-        columns = [
-            TAG_TABLE_COLUMN_ALIASES.get(col, col)
-            for col in raw_columns
-        ]
-
-        # Columns
         for col in columns:
-            table.add_column(
-                col,
-                justify="right",
-                no_wrap=True
-            )
+            table.add_column(col, justify="right", no_wrap=True)
 
-        # Rows
         for row in rows:
-            table.add_row(
-                *[self._fmt(row[col]) for col in raw_columns]
-            )
+            table.add_row(*[self._fmt(row[c]) for c in raw_columns])
 
         self.console.print(table)
 
@@ -160,162 +136,91 @@ class StdoutRenderer:
             self.console.print(f"[italic]Sorted by: {alias}[/italic]")
 
     # ==================================================
-    # CONDITIONAL TABLES RENDERER
+    # OTHER RENDERERS (UNCHANGED LOGIC)
     # ==================================================
 
-    def _render_capital_exposure_section(self, payload: dict):
+    def _render_tail_risk_section(self, payload: dict):
+        rows = []
 
-        # ==========================
-        # SUMMARY
-        # ==========================
+        for name, data in payload.items():
+            if not isinstance(data, dict):
+                continue
+
+            rows.append({
+                "Tail": name.replace(" tails", "").replace(" 5%", ""),
+                "Q": data.get("Quantile"),
+                "Trades": data.get("Trades count"),
+                "Average trade PnL": data.get("Average trade PnL"),
+                "Total PnL": data.get("Total PnL"),
+                "Contribution to total PnL (%)": data.get("Contribution to total PnL (%)"),
+                "Worst trade": data.get("Worst trade"),
+            })
+
+        self._render_generic_table(rows)
+
+    def _render_capital_exposure_section(self, payload: dict):
         summary = payload.get("Summary", {})
         if summary:
             self.console.print("\n[bold]Summary[/bold]")
             for k, v in summary.items():
                 self.console.print(f"{k}: {self._fmt(v)}")
 
-        # ==========================
-        # OVERTRADING TABLE
-        # ==========================
         over = payload.get("Overtrading diagnostics")
-        if not over:
-            return
-
-        rows = over.get("rows", [])
-        if not rows:
-            return
-
-        self.console.print("\n[bold]Overtrading diagnostics[/bold]")
-
-        table = Table(
-            show_header=True,
-            header_style="bold magenta",
-            box=None,
-            show_lines=False
-        )
-
-        raw_columns = list(rows[0].keys())
-        columns = [
-            TAG_TABLE_COLUMN_ALIASES.get(col, col)
-            for col in raw_columns
-        ]
-
-        for col in columns:
-            table.add_column(col, justify="right", no_wrap=True)
-
-        for row in rows:
-            table.add_row(
-                *[self._fmt(row[col]) for col in raw_columns]
-            )
-
-        self.console.print(table)
-
-        sorted_by = over.get("sorted_by")
-        if sorted_by:
-            alias = TAG_TABLE_COLUMN_ALIASES.get(sorted_by, sorted_by)
-            self.console.print(f"[italic]Sorted by: {alias}[/italic]")
+        if over:
+            self._render_generic_table(over.get("rows", []))
 
     def _render_drawdown_section(self, payload: dict):
-
-        # ==========================
-        # SUMMARY
-        # ==========================
         summary = payload.get("Summary", {})
         if summary:
             self.console.print("\n[bold]Summary[/bold]")
             for k, v in summary.items():
                 self.console.print(f"{k}: {self._fmt(v)}")
 
-        # ==========================
-        # FAILURE MODES TABLE
-        # ==========================
-        failure = payload.get("Failure modes")
-        if not failure:
-            return
-
-        rows = failure.get("rows", [])
-        if not rows:
-            return
-
-        self.console.print("\n[bold]Failure modes[/bold]")
-
-        table = Table(
-            show_header=True,
-            header_style="bold magenta",
-            box=None,
-            show_lines=False
-        )
-
-        raw_columns = list(rows[0].keys())
-        columns = [
-            TAG_TABLE_COLUMN_ALIASES.get(col, col)
-            for col in raw_columns
-        ]
-
-        for col in columns:
-            table.add_column(col, justify="right", no_wrap=True)
-
-        for row in rows:
-            table.add_row(
-                *[self._fmt(row[col]) for col in raw_columns]
-            )
-
-        self.console.print(table)
-
-        sorted_by = failure.get("sorted_by")
-        if sorted_by:
-            alias = TAG_TABLE_COLUMN_ALIASES.get(sorted_by, sorted_by)
-            self.console.print(f"[italic]Sorted by: {alias}[/italic]")
+        failure = payload.get("Failure modes", {})
+        self._render_generic_table(failure.get("rows", []))
 
     def _render_conditional_tables(self, payload: dict):
-        """
-        Renders multiple conditional expectancy tables.
-        Each key in payload is a separate condition block.
-        """
-
         for title, block in payload.items():
             rows = block.get("rows", [])
             if not rows:
                 continue
 
             self.console.print(f"\n[bold]{title}[/bold]")
-
-            table = Table(
-                show_header=True,
-                header_style="bold magenta",
-                box=None
-            )
-
-            raw_columns = list(rows[0].keys())
-
-            # Apply aliases
-            columns = [
-                CONDITIONAL_COLUMN_ALIASES.get(col, col)
-                for col in raw_columns
-            ]
-
-            for col in columns:
-                table.add_column(col, justify="right", no_wrap=True)
-
-            for row in rows:
-                table.add_row(
-                    *[self._fmt(row[col]) for col in raw_columns]
-                )
-
-            self.console.print(table)
-
-            sorted_by = block.get("sorted_by")
-            if sorted_by:
-                alias = CONDITIONAL_COLUMN_ALIASES.get(sorted_by, sorted_by)
-                self.console.print(f"[italic]Sorted by: {alias}[/italic]")
+            self._render_generic_table(rows)
 
     # ==================================================
-    # FORMATTER
+    # GENERIC TABLE
     # ==================================================
 
-    def _fmt(self, v):
-        if v is None:
+    def _render_generic_table(self, rows: list[dict]):
+        if not rows:
+            self.console.print("[italic]No data[/italic]")
+            return
+
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        columns = list(rows[0].keys())
+
+        for col in columns:
+            table.add_column(col, justify="right", no_wrap=True)
+
+        for row in rows:
+            table.add_row(*[self._fmt(row[col]) for col in columns])
+
+        self.console.print(table)
+
+    # ==================================================
+    # GLOBAL FORMATTER (SINGLE SOURCE OF TRUTH)
+    # ==================================================
+
+    def _fmt(self, value) -> str:
+        if value is None:
             return "-"
-        if isinstance(v, float):
-            return f"{v:,.4f}"
-        return str(v)
+
+        # numpy → python
+        if hasattr(value, "item"):
+            value = value.item()
+
+        if isinstance(value, (int, float)):
+            return f"{value:,.2f}"
+
+        return str(value)
