@@ -112,6 +112,7 @@ class MarketStructureEngine:
                 close=df["close"],
             )
             context["price_action"] = pa
+            out.update(pa)
         else:
             pa = None
 

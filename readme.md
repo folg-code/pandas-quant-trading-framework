@@ -180,6 +180,59 @@ Demonstrates **robust state handling in long-running systems**.
 
 ---
 
+## Performance & Profiling (Reference)
+
+This project includes **end-to-end runtime profiling** to track performance
+regressions and architectural changes over time.
+
+### Test Context
+- Market: **EURUSD**
+- Timeframes: **M5 + M30 informatives**
+- Timerange : **2019:01:01 - 2025:12:31**
+- Dataset size:
+  - M5: ~734,000 bars
+  - M30: ~123,000 bars
+- Mode: single-symbol, single-process
+- Strategy: HTS / structure-based strategy
+
+### Signal & Trade Volume (Intentional Stress Test)
+- **Generated signals:** ~302,000  
+- **Executed trades:** ~49,000  
+
+ The signal and trade counts are **intentionally unrealistically high**.  
+ This setup is used as a **performance stress test**, not as a realistic
+ trading configuration.
+
+ A higher number of trades directly increases:
+ - execution simulation complexity
+ - state transitions
+ - partial exit calculations
+ - reporting and statistics computation
+
+ This makes runtime measurements **more representative for worst-case
+ performance scenarios**.
+
+### Runtime Breakdown (Approximate)
+- Data loading: ~4.3s  
+- Informative timeframes (M30): ~2.5s  
+- Feature computation (`populate_indicators`): ~4.6s  
+- Entry logic & signal generation: ~3.5s  
+- Backtest engine (execution simulation): ~1.8s  
+- Reporting & analytics: ~2.7s  
+
+**Total runtime:** ~20 seconds
+
+Most of the runtime is spent on **feature computation and market structure logic**,
+which is expected at the current development stage.  
+Backtest execution itself is **not a bottleneck**, even with a very large number
+of generated signals and trades.
+
+This profiling snapshot serves as a **baseline reference**.
+Performance numbers may change as features, execution layers,
+or infrastructure evolve.
+
+---
+
 ## What This Repository Is (and Is Not)
 
 **This is:**

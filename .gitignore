@@ -85,4 +85,8 @@ market_data
 logs
 live_state_*/
 download/
-Strategies/
+# Ignore everything in Strategies
+Strategies/*
+
+# But keep this specific file
+!Strategies/Samplestrategy.py

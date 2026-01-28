@@ -4,11 +4,11 @@
 # DATA
 # ==================================================
 
-MARKET_DATA_PATH = "mmarket_data"
+MARKET_DATA_PATH = "market_data"
 BACKTEST_DATA_BACKEND = "dukascopy"   # "dukascopy" | "csv"
 
 TIMERANGE = {
-    "start": "2025-01-01",
+    "start": "2019-01-01",
     "end":   "2025-12-31",
 }
 
@@ -24,7 +24,7 @@ BACKTEST_WINDOWS = {
 # STRATEGY
 # ==================================================
 
-STRATEGY_CLASS = "Poisessions"
+STRATEGY_CLASS = "Samplestrategy"
 STARTUP_CANDLE_COUNT = 600
 
 SYMBOLS = [
@@ -45,4 +45,4 @@ SAVE_TRADES_CSV = False
 
 SERVER_TIMEZONE = "UTC"
 
-PLOT_ONLY = True
+PLOT_ONLY = False
