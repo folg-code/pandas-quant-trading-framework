@@ -1,8 +1,12 @@
 # config/live.py
+import logging
 
 # ==================================================
 # DATA / EXECUTION
 # ==================================================
+
+
+logging.basicConfig(level=logging.INFO)
 
 LIVE_DATA_BACKEND = "mt5"
 
@@ -12,15 +16,17 @@ ACCOUNT_INFO = {
     "SERVER": "SERVER",
 }
 
+DRY_RUN = False
+
+TICK_INTERVAL_SEC = 1.0
+
 # ==================================================
 # STRATEGY
 # ==================================================
 
-STRATEGY_CLASS = "Hts"
+STRATEGY_CLASS = "Samplestrategy"
 
-SYMBOLS = [
-    "EURUSD",
-]
+SYMBOLS = "EURUSD"
 
 TIMEFRAME = "M1"
 

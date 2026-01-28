@@ -58,6 +58,7 @@ class TradePlan:
     direction: Literal["long", "short"]
     entry_price: float
     entry_tag: str
+    volume: float
     exit_plan: Union[FixedExitPlan, ManagedExitPlan]
     strategy_name: str
     strategy_config: Dict[str, Any] = field(default_factory=dict)

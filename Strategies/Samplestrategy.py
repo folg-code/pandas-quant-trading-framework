@@ -181,9 +181,6 @@ class Samplestrategy(BaseStrategy):
             axis=1
         )
 
-        print("SIGNALES GENERATED", df['signal_entry'].notna().sum())
-
-
         self.df = df
         return df
 

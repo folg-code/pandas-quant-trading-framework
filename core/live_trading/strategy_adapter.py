@@ -10,10 +10,9 @@ class LiveStrategyAdapter:
         self,
         *,
         strategy: BaseStrategy,
-        volume: float,
     ):
         self.strategy = strategy
-        self.volume = volume
+
 
     # ==================================================
     # Public API (used by LiveEngine)
@@ -29,8 +28,6 @@ class LiveStrategyAdapter:
         if df.empty:
             print("⚠️ Strategy returned empty DF")
             return None
-
-        print("🧠 Strategy run on new candle")
 
         last_row = df.iloc[-1]
         return self.strategy.build_trade_plan(row=last_row)

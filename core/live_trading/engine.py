@@ -85,7 +85,6 @@ class LiveEngine:
             return
 
         self._last_candle_time = candle_time
-        print(f"🕯️ New candle closed at {candle_time}")
 
         plan = self.strategy_adapter.on_new_candle()
         if plan is not None:

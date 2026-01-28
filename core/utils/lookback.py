@@ -2,6 +2,13 @@ import re
 import pandas as pd
 from datetime import timedelta
 
+
+MIN_HTF_BARS = {
+    "M30": 400,
+    "H1": 300,
+    "H4": 200,
+}
+
 LOOKBACK_CONFIG = {
     "M1":  "24h",
     "M5":  "7d",

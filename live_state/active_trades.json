@@ -1,0 +1,18 @@
+{
+  "376893444": {
+    "trade_id": 376893444,
+    "symbol": "EURUSD",
+    "direction": "long",
+    "entry_price": 1.19453,
+    "volume": 0.37,
+    "sl": 1.19318,
+    "tp1": 1.1958800000000003,
+    "tp2": 1.1972300000000005,
+    "tp1_executed": false,
+    "entry_time": "2026-01-28T17:59:00+00:00",
+    "entry_tag": "mean_reversion_long",
+    "strategy": "Samplestrategy",
+    "strategy_config": {},
+    "ticket": 376893444
+  }
+}

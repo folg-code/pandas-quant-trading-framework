@@ -201,6 +201,18 @@ class MT5Adapter:
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             raise RuntimeError(f"SL modify failed: {result}")
 
+    def init_mt5(self):
+        if not mt5.initialize():
+            raise RuntimeError(f"MT5 init failed: {mt5.last_error()}")
+
+        info = mt5.account_info()
+        print(
+            "🟢 MT5 initialized | "
+            f"Account={info.login} "
+            f"Balance={info.balance} "
+            f"Server={info.server}"
+        )
+
     def shutdown(self):
         if not self.dry_run:
             mt5.shutdown()
