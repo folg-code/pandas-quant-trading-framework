@@ -1,0 +1,50 @@
+$bg: #0d1117;
+$card: #161b22;
+$text: #e6edf3;
+$muted: #8b949e;
+$accent: #58a6ff;
+
+body {
+  margin: 0;
+  background: $bg;
+  color: $text;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.container {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: $card;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1, h2 {
+  margin: 0 0 12px 0;
+}

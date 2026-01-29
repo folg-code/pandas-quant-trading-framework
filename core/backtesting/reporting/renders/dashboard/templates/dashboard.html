@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Risk Dashboard</title>
+
+  <link rel="stylesheet" href="static/dashboard.css">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+
+<script>
+  window.REPORT_DATA = {{ report_json | safe }};
+</script>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="header">
+    <h1>Risk & Strategy Dashboard</h1>
+  </header>
+
+  <!-- KPI GRID -->
+  <section class="kpi-grid" id="kpi-grid">
+    <!-- filled by JS -->
+  </section>
+
+  <!-- MAIN GRID -->
+  <section class="main-grid">
+
+    <div class="card">
+      <h2>Trade Distribution</h2>
+      <div id="trade-distribution-chart"></div>
+      <div id="trade-distribution-table"></div>
+    </div>
+
+    <div class="card">
+      <h2>Equity & Drawdown</h2>
+      <div id="equity-drawdown-chart"></div>
+    </div>
+
+  </section>
+
+  <!-- CONDITIONAL -->
+  <section class="card full-width">
+    <h2>Conditional Expectancy</h2>
+    <div id="conditional-heatmap"></div>
+  </section>
+
+  <!-- DIAGNOSTICS -->
+  <section class="card">
+    <h2>Diagnostics</h2>
+    <div id="diagnostics-tables"></div>
+  </section>
+
+</div>
+
+<script src="static/dashboard.js"></script>
+</body>
+</html>

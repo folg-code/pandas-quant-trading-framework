@@ -9,7 +9,7 @@ class ReportPersistence:
     Persist report outputs for dashboards / post-analysis.
     """
 
-    def __init__(self, base_dir: Path = Path("reports")):
+    def __init__(self, base_dir: Path = Path("results/reports")):
         self.base_dir = base_dir
 
     def persist(

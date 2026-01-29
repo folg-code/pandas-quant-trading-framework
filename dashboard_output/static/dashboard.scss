@@ -1,0 +1,51 @@
+$bg: #0f1117;
+$card: #161b22;
+$text: #e6edf3;
+$muted: #8b949e;
+$accent: #58a6ff;
+
+body {
+  background: $bg;
+  color: $text;
+  font-family: Inter, system-ui, sans-serif;
+  margin: 0;
+}
+
+.container {
+  max-width: 1400px;
+  margin: auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.card {
+  background: $card;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+h1, h2, h3 {
+  margin: 0 0 12px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  color: $muted;
+  padding: 6px 8px;
+  border-bottom: 1px solid #30363d;
+}
+
+td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #21262d;
+}
