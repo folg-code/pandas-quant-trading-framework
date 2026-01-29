@@ -47,7 +47,11 @@ class ExitLogicDiagnosticsSection(ReportSection):
             rows.append({
                 "Exit tag": str(tag),
                 "Trades": int(trades_n),
-                "Share (%)": {"raw": (trades_n / total_trades) if total_trades else np.nan, "kind": "pct"},
+                "Share (%)": {
+                    "raw": (trades_n / total_trades)
+                    if total_trades
+                    else np.nan,
+                    "kind": "pct"},
 
                 "Expectancy (USD)": float(pnl.mean()),
                 "Avg duration": {"raw": avg_duration_s, "kind": "duration_s"},
@@ -57,13 +61,17 @@ class ExitLogicDiagnosticsSection(ReportSection):
                 "Total PnL": float(pnl_sum),
 
                 "PnL contribution (%)": {
-                    "raw": (pnl_sum / pnl_denom) if pnl_denom == pnl_denom else np.nan,
+                    "raw": (pnl_sum / pnl_denom)
+                    if pnl_denom == pnl_denom
+                    else np.nan,
                     "kind": "pct",
                 },
 
                 "Max drawdown contribution (USD)": float(dd_contrib_usd),
                 "DD contribution (%)": {
-                    "raw": (dd_contrib_usd / dd_denom) if dd_denom == dd_denom else np.nan,
+                    "raw": (dd_contrib_usd / dd_denom)
+                    if dd_denom == dd_denom
+                    else np.nan,
                     "kind": "pct",
                 },
             })

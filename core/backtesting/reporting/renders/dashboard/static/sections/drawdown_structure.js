@@ -12,7 +12,6 @@ function renderDrawdownStructure(report) {
 
   const rows = payload["Failure modes"].rows;
 
-  // ---- top 7 deepest drawdowns ----
   const topDD = [...rows]
     .sort((a, b) => (window.rawValue(b["Depth"]) ?? 0) - (window.rawValue(a["Depth"]) ?? 0))
     .slice(0, 7);
@@ -59,7 +58,6 @@ function renderDrawdownStructure(report) {
     const equity = equityData.equity;
     const initial = equity[0];
 
-    // ---- map DD start -> equity value ----
     const ddX = [];
     const ddY = [];
     const ddColor = [];
@@ -124,7 +122,6 @@ function renderDrawdownStructure(report) {
   body.className = "diag-body";
   body.style.display = "block";
 
-  // ---- grid: table (2/3) + chart (1/3) ----
   const grid = document.createElement("div");
   grid.className = "diag-grid";
 

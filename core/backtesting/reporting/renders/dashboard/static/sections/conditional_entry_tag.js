@@ -98,7 +98,6 @@ function renderConditionalEntryTag(report) {
       }
     );
 
-    // 👇 KLUCZ: wymuś dopasowanie do kolumny grida
     setTimeout(() => {
       Plotly.Plots.resize(chartDiv);
     }, 0);
@@ -114,7 +113,7 @@ function renderConditionalEntryTag(report) {
     const opt = document.createElement("option");
     opt.value = r["Entry tag"];
     opt.textContent = r["Entry tag"];
-    if (i === 0) opt.selected = true; // ✅ KLUCZ
+    if (i === 0) opt.selected = true;
     select.appendChild(opt);
   });
 
@@ -126,7 +125,6 @@ function renderConditionalEntryTag(report) {
     summaryRoot.innerHTML = "";
     grid.innerHTML = "";
 
-    // ---------- SUMMARY (2/3 WIDTH) ----------
     const summaryRow = tagStats.rows.find(
       r => r["Entry tag"] === entryTag
     );
@@ -164,7 +162,6 @@ function renderConditionalEntryTag(report) {
       }
     });
 
-    // ---------- NON-TIME CONTEXTS (1/4 EACH) ----------
     contextCharts.forEach(c => {
       const box = document.createElement("div");
       box.className = "context-chart";
@@ -172,7 +169,6 @@ function renderConditionalEntryTag(report) {
       grid.appendChild(box);
     });
 
-    // ---------- TIME CONTEXT (ONCE, AT END, 1/2) ----------
     if (timeCharts.length) {
       const t = timeCharts[0];
       const box = document.createElement("div");
@@ -191,6 +187,5 @@ function renderConditionalEntryTag(report) {
     el.onchange = () => render(select.value);
   });
 
-  // ---------- INITIAL RENDER ----------
   render(select.value);
 }

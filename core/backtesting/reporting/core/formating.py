@@ -126,16 +126,22 @@ def coerce_value(obj: Any, *, default_kind: str = "auto") -> Value:
 
 
 def materialize(obj: Any) -> Any:
-    # already-wrapped values
     if isinstance(obj, Value) or _is_value_dict(obj):
         v = coerce_value(obj)
         display = v.display if v.display is not None else format_value(v.raw, v.kind)
-        return {"raw": v.raw, "kind": v.kind, "display": display}
+        return {
+            "raw": v.raw,
+            "kind": v.kind,
+            "display": display
+        }
 
-    # ✅ auto-wrap numeric primitives so rounding applies everywhere
     if isinstance(obj, (int, float)):
         kind = "int" if isinstance(obj, int) else "auto"
-        return {"raw": obj, "kind": kind, "display": format_value(obj, kind)}
+        return {
+            "raw": obj,
+            "kind": kind,
+            "display": format_value(obj, kind)
+        }
 
     if isinstance(obj, dict):
         return {k: materialize(v) for k, v in obj.items()}

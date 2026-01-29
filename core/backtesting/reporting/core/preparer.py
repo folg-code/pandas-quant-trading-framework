@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 class RiskDataPreparer:
     """
     Prepares trades DataFrame for risk metrics.
@@ -17,7 +18,6 @@ class RiskDataPreparer:
 
         df["equity"] = self.initial_balance + df["pnl_usd"].cumsum()
 
-        # --- drawdown ---
         df["equity_peak"] = df["equity"].cummax()
         df["drawdown"] = df["equity_peak"] - df["equity"]
 

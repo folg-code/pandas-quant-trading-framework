@@ -2,11 +2,9 @@ function renderKPI(report) {
   const root = document.getElementById("kpi-grid");
   if (!root) return;
 
-  // section name from python
   const payload = report["Core Performance Metrics"];
   if (!payload) return;
 
-  // pick KPIs (keys must match what your section emits)
   const kpis = [
     { label: "Total return (%)", key: "Total return (%)" },
     { label: "CAGR (%)", key: "CAGR (%)" },

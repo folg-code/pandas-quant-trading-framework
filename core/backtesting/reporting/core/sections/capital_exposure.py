@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from typing import Dict, Any
 
@@ -20,7 +19,6 @@ class CapitalExposureSection(ReportSection):
         if trades.empty:
             return {"error": "No trades available"}
 
-        # Ensure datetime
         trades["entry_time"] = pd.to_datetime(trades["entry_time"], utc=True)
         trades["exit_time"] = pd.to_datetime(trades["exit_time"], utc=True)
 

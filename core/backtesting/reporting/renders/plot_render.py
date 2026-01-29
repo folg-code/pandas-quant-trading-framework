@@ -34,7 +34,9 @@ class PlotRenderer:
 
     def generic_table(self, rows: list[dict]) -> go.Table:
         if not rows:
-            return go.Table(header=dict(values=["No data"]), cells=dict(values=[[]]))
+            return go.Table(
+                header=dict(values=["No data"]), cells=dict(values=[[]])
+            )
 
         columns = list(rows[0].keys())
         values = [[self._fmt(row[c]) for row in rows] for c in columns]

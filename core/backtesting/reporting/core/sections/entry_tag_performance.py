@@ -24,7 +24,6 @@ class EntryTagPerformanceSection(ReportSection):
 
         total_trades = int(len(trades))
 
-        # precompute sums for nicer contributions (bounded <= 100% by construction)
         by_tag = list(trades.groupby("entry_tag"))
         pnl_sum_by_tag = {tag: float(g["pnl_usd"].sum()) for tag, g in by_tag}
         dd_sum_by_tag = {tag: float(self._dd_contribution(g)) for tag, g in by_tag}
@@ -49,7 +48,10 @@ class EntryTagPerformanceSection(ReportSection):
             results.append({
                 "Entry tag": str(tag),
                 "Trades": int(trades_n),
-                "Share (%)": {"raw": (trades_n / total_trades) if total_trades else np.nan, "kind": "pct"},
+                "Share (%)": {
+                    "raw": (trades_n / total_trades) if total_trades else np.nan,
+                    "kind": "pct"
+                },
 
                 "Expectancy (USD)": float(expectancy),
                 "Avg duration": {"raw": avg_duration_s, "kind": "duration_s"},
@@ -73,7 +75,8 @@ class EntryTagPerformanceSection(ReportSection):
                 },
             })
 
-        results = sorted(results, key=lambda x: x["Expectancy (USD)"], reverse=True)
+        results = sorted(
+            results, key=lambda x: x["Expectancy (USD)"], reverse=True)
 
         return {"rows": results, "sorted_by": "Expectancy (USD)"}
 
@@ -81,7 +84,7 @@ class EntryTagPerformanceSection(ReportSection):
     # Helpers
     # ==================================================
     @staticmethod
-    def _max_consecutive( mask):
+    def _max_consecutive(mask):
         """
         Computes max consecutive True values in a boolean Series.
         """

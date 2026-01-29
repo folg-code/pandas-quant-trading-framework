@@ -15,7 +15,6 @@ function renderEquityDrawdown(report) {
   Plotly.newPlot(
     root,
     [
-      // ---- Equity curve ----
       {
         x: time,
         y: equity,
@@ -26,7 +25,6 @@ function renderEquityDrawdown(report) {
         yaxis: "y1",
       },
 
-      // ---- Drawdown area ----
       {
         x: time,
         y: drawdown,

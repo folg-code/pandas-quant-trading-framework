@@ -16,7 +16,6 @@ class TradeContextEnricher:
     def enrich(self, trades: pd.DataFrame, contexts: list) -> pd.DataFrame:
         df = trades.copy()
 
-        # 🔑 NORMALIZE ENTRY_TIME
         df["entry_time"] = pd.to_datetime(df["entry_time"], utc=True)
 
         for ctx in contexts:

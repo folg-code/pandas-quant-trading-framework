@@ -14,7 +14,7 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
 
     name = "Conditional Entry Tag Performance"
     MAX_NUMERIC_UNIQUES = 25
-    MAX_CATEGORY_UNIQUES = 64  # warning threshold (optional)
+    MAX_CATEGORY_UNIQUES = 64
 
     def compute(self, ctx: ReportContext) -> Dict[str, Any]:
         trades = ctx.trades.copy()
@@ -32,21 +32,14 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
         results: Dict[str, Any] = {}
         issues = []
 
-        # -----------------------------------
-        # 1) By market regime (auto contexts)
-        # -----------------------------------
         context_cols, detect_issues = self._detect_context_columns(trades)
         issues.extend(detect_issues)
 
         for col in context_cols:
             results[f"By {col}"] = self._by_context(trades, col)
 
-        # -----------------------------------
-        # 2) By hour of day
-        # -----------------------------------
         results["By hour"] = self._by_context(trades, "hour")
 
-        # Attach issues (so dashboard/stdout can show them)
         if issues:
             results["__context_issues__"] = {"rows": issues}
 
@@ -58,7 +51,6 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
 
     @staticmethod
     def _norm_ctx(v):
-        # normalize context values for grouping/labels
         if v is None or (isinstance(v, float) and pd.isna(v)) or pd.isna(v):
             return None
         if isinstance(v, (bool, np.bool_)):
@@ -68,7 +60,6 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
     def _by_context(self, trades, context_col):
         rows = []
 
-        # normalize the context into a safe categorical key
         tmp = trades.copy()
         tmp["_ctx"] = tmp[context_col].map(self._norm_ctx)
 
@@ -122,26 +113,24 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
             if s_nonnull.empty:
                 continue
 
-            # allow booleans
             if pd.api.types.is_bool_dtype(s.dtype) or s_nonnull.map(lambda v: isinstance(v, (bool, np.bool_))).all():
                 cols.append(c)
                 continue
 
-            # numeric: reject if too many unique
             if pd.api.types.is_numeric_dtype(s.dtype):
                 uniq = int(pd.Series(s_nonnull.unique()).nunique())
                 if uniq > self.MAX_NUMERIC_UNIQUES:
                     issues.append({
                         "level": "error",
                         "context": c,
-                        "message": f"Numeric context has too many unique values ({uniq} > {self.MAX_NUMERIC_UNIQUES}). Skipped.",
+                        "message": f"Numeric context has too many unique values "
+                                   f"({uniq} > {self.MAX_NUMERIC_UNIQUES}). Skipped.",
                         "unique_count": uniq,
                     })
                     continue
                 cols.append(c)
                 continue
 
-            # object/category: accept
             if s.dtype == object or pd.api.types.is_categorical_dtype(s.dtype):
                 uniq = int(s_nonnull.astype(str).nunique())
                 if uniq > self.MAX_CATEGORY_UNIQUES:

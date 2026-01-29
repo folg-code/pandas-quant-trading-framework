@@ -26,11 +26,8 @@ function renderTradeDistribution(report) {
 
   const buckets = rows.map(r => r["Bucket"]);
 
-  // ✅ numbers must use rawValue after materialize()
   const trades = rows.map(r => Number(window.rawValue(r["Trades"])) || 0);
 
-  // If Share (%) was materialized from a fraction, raw may be 0.xx.
-  // Pie expects proportions, so raw is fine. If raw is already 0-100, still fine (relative weights).
   const shares = rows.map(r => Number(window.rawValue(r["Share (%)"])) || 0);
 
   const durations = rows.map(r => Number(window.rawValue(r["Avg duration"])) || 0);

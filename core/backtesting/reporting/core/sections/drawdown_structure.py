@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from core.backtesting.reporting.core.section import ReportSection
 from core.backtesting.reporting.core.context import ReportContext
@@ -50,8 +50,15 @@ class DrawdownStructureSection(ReportSection):
     # ==================================================
     # Core logic
     # ==================================================
-
-    def _build_episode(self, start_idx, end_idx, trough, peak, trough_idx, trades):
+    @staticmethod
+    def _build_episode(
+            start_idx,
+            end_idx,
+            trough,
+            peak,
+            trough_idx,
+            trades
+    ):
         start_time = trades.loc[start_idx, "exit_time"]
         end_time = (
             trades.loc[end_idx, "exit_time"]
@@ -109,7 +116,6 @@ class DrawdownStructureSection(ReportSection):
                     trough = value
                     trough_idx = idx
 
-        # unrecovered drawdown
         if in_dd:
             episodes.append(self._build_episode(
                 start_idx, None, trough, peak, trough_idx, trades

@@ -1,6 +1,3 @@
-import subprocess
-from pathlib import Path
-
 from config.backtest import INITIAL_BALANCE
 from core.backtesting.reporting.core.context import ReportContext
 from core.backtesting.reporting.core.equity import EquityPreparer
@@ -100,6 +97,5 @@ class ReportRunner:
         )
 
         DashboardRenderer().render(data, ctx)
-
 
         print("\n✅ Dashboard built successfully\n")

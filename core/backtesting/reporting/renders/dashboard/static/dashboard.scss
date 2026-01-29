@@ -75,11 +75,10 @@ body {
 
 .top-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;   // 👈 2/3 + 1/3
+  grid-template-columns: 2fr 1fr;
   gap: 16px;
   margin-bottom: 24px;
-  align-items: stretch;             // 👈 KLUCZ
-}
+  align-items: stretch;
 
 /* KPI panel fills height */
 .kpi-panel {
@@ -90,7 +89,7 @@ body {
 /* Compact KPI grid */
 .kpi-grid.compact {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); // 2 × 2
+  grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, 1fr);
   gap: 12px;
   flex: 1;
@@ -123,7 +122,7 @@ body {
 
 .trade-dist-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); // 3 × 1/3
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
@@ -178,7 +177,7 @@ h1, h2 {
 
 .conditional-context-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 

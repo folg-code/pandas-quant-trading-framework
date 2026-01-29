@@ -1,6 +1,3 @@
-import numpy as np
-from typing import Dict, Any
-
 import pandas as pd
 
 from core.backtesting.reporting.core.section import ReportSection
@@ -19,7 +16,6 @@ class CorePerformanceSection(ReportSection):
 
         trades = ctx.trades
         equity = trades["equity"]
-
 
         initial_balance = ctx.initial_balance
         final_balance = equity.iloc[-1]
@@ -47,16 +43,49 @@ class CorePerformanceSection(ReportSection):
 
         expectancy = pnl.mean()
 
-        max_dd_abs = float(trades["drawdown"].max()) if "drawdown" in trades.columns else None
-        max_dd_pct = (max_dd_abs / initial_balance) if (max_dd_abs is not None and initial_balance) else None
+        max_dd_abs = (
+            float(trades["drawdown"].max())
+            if "drawdown" in trades.columns
+            else None
+        )
+        max_dd_pct = (
+            (max_dd_abs / initial_balance)
+            if (max_dd_abs is not None and initial_balance)
+            else None
+        )
 
         return {
-            "Total return (%)": {"raw": float(total_return), "kind": "pct"},
-            "CAGR (%)": {"raw": float(cagr) if cagr is not None else None, "kind": "pct"},
-            "Profit factor": {"raw": float(profit_factor) if profit_factor is not None else None, "kind": "num"},
-            "Expectancy (USD)": {"raw": float(expectancy), "kind": "money"},
-            "Max drawdown ($)": {"raw": float(max_dd_abs) if max_dd_abs is not None else None, "kind": "money"},
-            "Max drawdown (%)": {"raw": float(max_dd_pct) if max_dd_pct is not None else None, "kind": "pct"},
+            "Total return (%)": {
+                "raw": float(total_return),
+                "kind": "pct"
+            },
+            "CAGR (%)": {
+                "raw": float(cagr)
+                if cagr is not None
+                else None,
+                "kind": "pct"
+            },
+            "Profit factor": {
+                "raw": float(profit_factor)
+                if profit_factor is not None
+                else None,
+                "kind": "num"
+            },
+            "Expectancy (USD)": {
+                "raw": float(expectancy),
+                "kind": "money"},
+            "Max drawdown ($)": {
+                "raw": float(max_dd_abs)
+                if max_dd_abs is not None
+                else None,
+                "kind": "money"
+            },
+            "Max drawdown (%)": {
+                "raw": float(max_dd_pct)
+                if max_dd_pct is not None
+                else None,
+                "kind": "pct"
+            },
         }
 
     # ==================================================

@@ -50,7 +50,6 @@ function renderConditionalExpectancy(report) {
     );
   }
 
-  // By hour of day
   if (section["By hour of day"]?.rows) {
     const HOURS = Array.from({ length: 24 }, (_, i) => String(i));
     const map = {};
@@ -63,7 +62,6 @@ function renderConditionalExpectancy(report) {
     renderBar("cond-hour", "By hour of day", HOURS, values, 260);
   }
 
-  // By day of week
   if (section["By day of week"]?.rows) {
     const ORDER = [
       "Monday", "Tuesday", "Wednesday",
@@ -79,7 +77,6 @@ function renderConditionalExpectancy(report) {
     renderBar("cond-weekday", "By day of week", ORDER, values, 260);
   }
 
-  // By context
   const contextRoot = document.getElementById("cond-context-grid");
   if (!contextRoot) return;
 

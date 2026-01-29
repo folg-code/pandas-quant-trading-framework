@@ -15,7 +15,7 @@ class ConditionalExpectancySection(ReportSection):
 
     name = "Conditional Expectancy Analysis"
     MAX_NUMERIC_UNIQUES = 10
-    MAX_CATEGORY_UNIQUES = 64  # optional warning threshold
+    MAX_CATEGORY_UNIQUES = 64
 
     def compute(self, ctx: ReportContext) -> Dict[str, Any]:
         trades = ctx.trades.copy()
@@ -49,7 +49,6 @@ class ConditionalExpectancySection(ReportSection):
         for col in context_cols:
             results[f"By context: {col}"] = self._group_expectancy(trades, group_col=col)
 
-        # attach issues so you can see what was skipped (but report continues)
         if issues:
             results["__context_issues__"] = {"rows": issues}
 
@@ -86,7 +85,6 @@ class ConditionalExpectancySection(ReportSection):
         """
         tmp = trades.copy()
 
-        # normalize grouping key for non-time contexts too (works fine for hour/weekday as well)
         tmp["_ctx"] = tmp[group_col].map(self._norm_ctx)
 
         rows = []
@@ -141,7 +139,8 @@ class ConditionalExpectancySection(ReportSection):
                 continue
 
             # booleans allowed
-            if pd.api.types.is_bool_dtype(s.dtype) or s_nonnull.map(lambda v: isinstance(v, (bool, np.bool_))).all():
+            if pd.api.types.is_bool_dtype(s.dtype) or s_nonnull.map(
+                    lambda v: isinstance(v, (bool, np.bool_))).all():
                 cols.append(col)
                 continue
 
@@ -152,21 +151,22 @@ class ConditionalExpectancySection(ReportSection):
                     issues.append({
                         "level": "error",
                         "context": col,
-                        "message": f"Numeric context has too many unique values ({uniq} > {self.MAX_NUMERIC_UNIQUES}). Skipped.",
+                        "message": f"Numeric context has too many unique values "
+                                   f"({uniq} > {self.MAX_NUMERIC_UNIQUES}). Skipped.",
                         "unique_count": uniq,
                     })
                     continue
                 cols.append(col)
                 continue
 
-            # object/category: accept
             if s.dtype == object or pd.api.types.is_categorical_dtype(s.dtype):
                 uniq = int(s_nonnull.astype(str).nunique())
                 if uniq > self.MAX_CATEGORY_UNIQUES:
                     issues.append({
                         "level": "warning",
                         "context": col,
-                        "message": f"Context has high cardinality ({uniq}). Consider bucketing.",
+                        "message": f"Context has high cardinality "
+                                   f"({uniq}). Consider bucketing.",
                         "unique_count": uniq,
                     })
                 cols.append(col)

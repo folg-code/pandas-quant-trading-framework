@@ -60,9 +60,8 @@ function renderDiagnostics(report) {
     const vals = rawValues.map(v => Number(v) || 0);
     const denom = vals.reduce((acc, v) => acc + Math.abs(v), 0) || 1;
 
-    // Percent shares (sum of abs shares = 100%)
     const pos = vals.map(v => (v > 0 ? (v / denom) * 100 : 0));
-    const neg = vals.map(v => (v < 0 ? (-v / denom) * 100 : 0)); // plotted as positive magnitude
+    const neg = vals.map(v => (v < 0 ? (-v / denom) * 100 : 0));
 
     Plotly.newPlot(
       div,
@@ -192,7 +191,6 @@ function renderDiagnostics(report) {
     tile.appendChild(div);
     container.appendChild(tile);
 
-    // durationVals may be materialized objects -> take raw seconds
     const seconds = durationVals.map(v => Number(window.rawValue(v)) || 0);
     const hours = seconds.map(s => s / 3600);
 
@@ -227,7 +225,6 @@ function renderDiagnostics(report) {
 
     const body = makePanel(title);
 
-    // ---- row 1: table (3/4) + share pie (1/4)
     const row1 = document.createElement("div");
     row1.className = "grid-3-1";
 
@@ -246,7 +243,6 @@ function renderDiagnostics(report) {
     const share = rows.map(r => window.rawValue(r["Share (%)"]) ?? 0);
     renderPie(shareTile, "Share of occurrences", labels, share);
 
-    // ---- row 2: 4 tiles
     const row2 = document.createElement("div");
     row2.className = "grid-4";
     body.appendChild(row2);
@@ -257,11 +253,9 @@ function renderDiagnostics(report) {
     const avgDur = rows.map(r => window.rawValue(r["Avg duration"]) ?? 0);
     renderBarDuration(row2, "Avg duration by tag", labels, rows.map(r => r["Avg duration"]));
 
-    // --- PnL contribution: use SIGNED raw PnL (best), fallback to contribution if you insist ---
     const pnlRaw = rows.map(r => window.rawValue(r["Total PnL"]) ?? 0);
     renderSignedContribution100(row2, "PnL contribution (100% of |total|)", labels, pnlRaw, "Share of |Total PnL| (%)");
 
-    // --- DD contribution: drawdown is usually non-negative; still fine (all goes to Positive) ---
     const ddRaw = rows.map(r => window.rawValue(r["Max drawdown contribution (USD)"]) ?? 0);
     renderSignedContribution100(row2, "DD contribution (100% of |total|)", labels, ddRaw, "Share of |DD contribution| (%)");
   }

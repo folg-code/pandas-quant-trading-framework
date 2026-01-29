@@ -85,7 +85,7 @@ function renderCapitalExposure(report) {
         },
       }],
       {
-        height: 260, // ✅ same as trade distribution tiles
+        height: 260,
         margin: { t: 20, l: 50, r: 20, b: 60 },
         paper_bgcolor: "#161b22",
         plot_bgcolor: "#161b22",
@@ -113,7 +113,6 @@ function renderCapitalExposure(report) {
   // ==================================================
 
   if (section.Summary) {
-    // Summary is a dict; wrap it as a single-row table
     summaryRoot.appendChild(renderTableLikeDrawdown([section.Summary]));
   }
 
