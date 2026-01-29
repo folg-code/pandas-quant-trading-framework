@@ -30,22 +30,29 @@ class ExitLogicDiagnosticsSection(ReportSection):
             axis=1
         )
 
-        total_pnl = trades["pnl_usd"].sum()
+        total_pnl = float(trades["pnl_usd"].sum())
+        denom = abs(total_pnl) if total_pnl != 0 else np.nan
         rows = []
+
+
 
         for tag, g in trades.groupby("exit_compound_tag"):
             pnl = g["pnl_usd"]
+
+            avg_duration_s = float(g["duration"].mean()) if "duration" in g.columns else np.nan
 
             rows.append({
                 "Exit tag": str(tag),
                 "Trades": int(len(g)),
                 "Expectancy (USD)": float(pnl.mean()),
+                "Avg duration": {"raw": avg_duration_s, "kind": "duration_s"},
                 "Win rate": float((pnl > 0).mean()),
                 "Average PnL": float(pnl.mean()),
                 "Total PnL": float(pnl.sum()),
-                "Contribution to total PnL (%)": (
-                    float(pnl.sum() / total_pnl) if total_pnl != 0 else np.nan
-                ),
+                "Contribution to total PnL (%)": {
+                    "raw": (float(pnl.sum()) / denom) if denom == denom else np.nan,
+                    "kind": "pct",
+                },
             })
 
         # Sort by expectancy (DESC)

@@ -27,44 +27,75 @@ class Value:
 # -----------------------------
 
 def format_value(raw: Any, kind: str = "auto") -> str:
-    """
-    Returns a DISPLAY string.
-    Keeps raw untouched elsewhere.
-    """
+    # -----------------------------
+    # Nulls
+    # -----------------------------
     if raw is None:
         return "-"
 
-    # if already a string, keep it
+    # -----------------------------
+    # Strings (labels, tags, dates)
+    # -----------------------------
     if isinstance(raw, str):
         return raw
 
-    # ints
+    # -----------------------------
+    # Integers (counts, N, streaks)
+    # -----------------------------
     if isinstance(raw, int) and kind in {"auto", "int"}:
         return f"{raw:,d}"
 
-    # floats
-    if isinstance(raw, float) or isinstance(raw, int):
+    # -----------------------------
+    # Numbers (floats / numeric metrics)
+    # -----------------------------
+    if isinstance(raw, (float, int)):
         x = float(raw)
 
+        def sig5(v: float) -> str:
+            # 5 significant digits
+            return f"{v:.5g}"
+
+        # ---- duration in seconds ----
+        if kind == "duration_s":
+            total = int(round(x))
+            if total < 0:
+                total = 0
+
+            days = total // 86400
+            rem = total % 86400
+            hours = rem // 3600
+            rem %= 3600
+            minutes = rem // 60
+            seconds = rem % 60
+
+            parts = []
+            if days:
+                parts.append(f"{days}d")
+            if hours or days:
+                parts.append(f"{hours}h")
+            if minutes or hours or days:
+                parts.append(f"{minutes}m")
+            parts.append(f"{seconds}s")
+
+            return " ".join(parts)
+
+        # ---- percentages (raw = 0..1) ----
         if kind == "pct":
-            return f"{x * 100:,.2f}%"
+            return f"{sig5(x * 100)}%"
 
-        # money: usually 2 decimals; if you want 4, change here once
+        # ---- money / numeric metrics ----
         if kind == "money":
-            return f"{x:,.2f}"
+            return sig5(x)
 
-        # num: default numeric formatting (4 decimals like you already do)
         if kind in {"auto", "num"}:
-            return f"{x:,.4f}"
+            return sig5(x)
 
-        # significant digits
-        if kind == "sig4":
-            # 4 significant digits, keeps scientific when needed
-            return f"{x:.4g}"
-
-        # fallback
+        # ---- unknown numeric kind ----
         return str(raw)
 
+    # -----------------------------
+    # Fallback (should be rare)
+    # -----------------------------
     return str(raw)
 
 

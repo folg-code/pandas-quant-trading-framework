@@ -19,7 +19,7 @@ function renderDiagnostics(report) {
       <tbody>
         ${rows.map(r => `
           <tr>
-            ${columns.map(c => `<td>${r[c]}</td>`).join("")}
+            ${columns.map(c => `<td>${window.displayValue(r[c])}</td>`).join("")}
           </tr>
         `).join("")}
       </tbody>
@@ -41,7 +41,9 @@ function renderDiagnostics(report) {
     container.appendChild(titleEl);
     container.appendChild(chartDiv);
 
-    const maxAbs = Math.max(...values.map(v => Math.abs(v)));
+    // ✅ values may contain objects -> force numeric raw
+    const safe = values.map(v => Number(v) || 0);
+    const maxAbs = Math.max(1e-9, ...safe.map(v => Math.abs(v)));
 
     Plotly.newPlot(
       chartDiv,
@@ -49,9 +51,9 @@ function renderDiagnostics(report) {
         {
           type: "bar",
           x: categories,
-          y: values,
+          y: safe,
           marker: {
-            color: values,
+            color: safe,
             colorscale: "RdBu",
             cmin: -maxAbs,
             cmax: maxAbs,
@@ -89,9 +91,8 @@ function renderDiagnostics(report) {
 
     const body = document.createElement("div");
     body.className = "diag-body";
-    body.style.display = "block"; // 👈 DOMYŚLNIE ROZWINIĘTE
+    body.style.display = "block";
 
-    // ---- GRID 2/3 + 1/3 ----
     const grid = document.createElement("div");
     grid.className = "diag-grid";
 
@@ -101,45 +102,33 @@ function renderDiagnostics(report) {
     const chartWrap = document.createElement("div");
     chartWrap.className = "diag-chart";
 
-    // ---- TABLE (LEFT 2/3) ----
+    // ---- TABLE ----
     tableWrap.appendChild(renderTable(payload.rows));
 
-    // ---- CHART (RIGHT 1/3) ----
+    // ---- CHARTS ----
     if (title === "Performance by Entry Tag") {
-      const tags = payload.rows.map(r => r["Entry tag"]);
-      const expectancy = payload.rows.map(
-        r => r["EXP"] ?? r["Expectancy (USD)"]
+      const tags = payload.rows.map(r => window.displayValue(r["Entry tag"]));
+      const expectancy = payload.rows.map(r =>
+        window.rawValue(r["EXP"] ?? r["Expectancy (USD)"]) ?? 0
       );
 
-      renderBarChart(
-        chartWrap,
-        "Expectancy by Entry Tag",
-        tags,
-        expectancy
-      );
+      renderBarChart(chartWrap, "Expectancy by Entry Tag", tags, expectancy);
     }
 
     if (title === "Exit Logic Diagnostics") {
-      const tags = payload.rows.map(r => r["Exit tag"]);
-      const pnl = payload.rows.map(r => r["PnL"]);
+      const tags = payload.rows.map(r => window.displayValue(r["Exit tag"]));
+      const pnl = payload.rows.map(r => window.rawValue(r["PnL"]) ?? 0);
 
-      renderBarChart(
-        chartWrap,
-        "Total PnL by Exit Tag",
-        tags,
-        pnl
-      );
+      renderBarChart(chartWrap, "Total PnL by Exit Tag", tags, pnl);
     }
 
-    // ---- ASSEMBLE ----
     grid.appendChild(tableWrap);
     grid.appendChild(chartWrap);
 
     body.appendChild(grid);
 
     header.onclick = () => {
-      body.style.display =
-        body.style.display === "none" ? "block" : "none";
+      body.style.display = body.style.display === "none" ? "block" : "none";
     };
 
     wrapper.appendChild(header);
@@ -152,10 +141,7 @@ function renderDiagnostics(report) {
   // ==================================================
 
   Object.entries(report).forEach(([key, payload]) => {
-    if (
-      key === "Performance by Entry Tag" ||
-      key === "Exit Logic Diagnostics"
-    ) {
+    if (key === "Performance by Entry Tag" || key === "Exit Logic Diagnostics") {
       renderSection(key, payload);
     }
   });
