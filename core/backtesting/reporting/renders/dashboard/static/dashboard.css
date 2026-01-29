@@ -1,0 +1,287 @@
+body {
+  margin: 0;
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.container {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.config-card {
+  background: #161b22;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.config-card h4 {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  color: #58a6ff;
+}
+
+.config-list {
+  font-size: 13px;
+}
+
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #30363d;
+}
+
+.config-row:last-child {
+  border-bottom: none;
+}
+
+.config-key {
+  color: #8b949e;
+}
+
+.config-value {
+  color: #e6edf3;
+  text-align: right;
+  max-width: 60%;
+}
+
+.top-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+
+/* KPI panel fills height */
+.kpi-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Compact KPI grid */
+.kpi-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 12px;
+  flex: 1;
+}
+
+/* KPI cards inside */
+.kpi-grid.compact .card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.kpi-grid.compact h3 {
+  font-size: 13px;
+  color: #8b949e;
+  margin-bottom: 6px;
+}
+
+.kpi-grid.compact .kpi-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.trade-dist-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.trade-dist-row > div {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 260px;
+}
+
+.trade-dist-row h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.card {
+  background: #161b22;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.full-width {
+  grid-column: 1/-1;
+}
+
+#equity-drawdown-chart {
+  width: 100%;
+  min-height: 420px;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1, h2 {
+  margin: 0 0 12px 0;
+}
+
+.conditional-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.conditional-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.conditional-row > div,
+.conditional-context-grid > div {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.diag-section {
+  margin-bottom: 16px;
+}
+
+.diag-header {
+  cursor: pointer;
+  padding: 8px 12px;
+  background: #0d1117;
+  border-radius: 6px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diag-header span {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.diag-body {
+  display: none;
+  margin-top: 8px;
+}
+
+.diag-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.diag-body th,
+.diag-body td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #30363d;
+  text-align: right;
+}
+
+.diag-body th:first-child,
+.diag-body td:first-child {
+  text-align: left;
+}
+
+.diag-body {
+  display: block;
+  margin-top: 8px;
+}
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.diag-table {
+  overflow-x: auto;
+}
+
+.diag-chart {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.entry-selector {
+  margin-bottom: 12px;
+}
+
+.entry-summary {
+  width: 66%;
+  margin-bottom: 24px;
+}
+
+.conditional-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.context-chart,
+.time-chart {
+  grid-column: span 3;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.time-chart {
+  grid-column: span 6;
+}
+
+.context-chart > div,
+.time-chart > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.capital-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.capital-row > div {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Plotly containers */
+.capital-row > div > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 260px;
+}
+
+/*# sourceMappingURL=dashboard.css.map */

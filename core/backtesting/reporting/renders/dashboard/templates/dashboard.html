@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Risk Dashboard</title>
+
+  <link rel="stylesheet" href="static/dashboard.css">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+
+<body>
+
+<!-- GLOBAL REPORT CONTEXT -->
+<script>
+  window.REPORT_DATA = {{ report_json | safe }};
+</script>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="header">
+    <h1>Risk & Strategy Dashboard</h1>
+  </header>
+  
+  <section class="top-grid">
+
+    <!-- LEFT: Backtest Config -->
+    <div class="card">
+      <h2>Backtest Configuration & Assumptions</h2>
+      <div id="backtest-config" class="config-grid"></div>
+    </div>
+  
+    <!-- RIGHT: KPI -->
+    <div class="card kpi-panel">
+      <h2>KPI Metrics</h2>
+      <div class="kpi-grid compact" id="kpi-grid"></div>
+    </div>
+  
+  </section>
+  
+  <section class="card full-width">
+      <h2>Trade Distribution</h2>
+    
+      <div class="trade-dist-row">
+        <div id="trade-r-count"></div>
+        <div id="trade-r-share"></div>
+        <div id="trade-r-duration"></div>
+      </div>
+    </section>
+  
+  <div class="card full-width">
+      <h2>Equity & Drawdown</h2>
+      <div id="equity-drawdown-chart"></div>
+    </div>
+
+  <!-- CONDITIONAL -->
+  <section class="card full-width">
+    <h2>Conditional Expectancy</h2>
+  
+    <!-- Row: hour + weekday -->
+    <div class="conditional-row">
+      <div id="cond-hour" class="cond-span-2"></div>
+      <div id="cond-weekday" class="cond-span-1"></div>
+    </div>
+  
+    <!-- Context rows -->
+    <div id="cond-context-grid" class="conditional-context-grid"></div>
+  </section>
+
+  <!-- DIAGNOSTICS -->
+  <section class="card">
+    <h2>Diagnostics</h2>
+    <div id="diagnostics"></div>
+  </section>
+  
+  <section class="card full-width">
+    <h2>Drawdown Structure</h2>
+    <div id="drawdown-structure"></div>
+  </section>
+  
+  <section class="card full-width">
+    <h2>Conditional Entry Tag Performance</h2>
+  
+    <!-- Selector -->
+    <div class="entry-selector">
+      <label>Entry tag:</label>
+      <select id="conditional-entry-select"></select>
+    </div>
+    
+    <div class="conditional-controls">
+      <label>
+        Min trades:
+        <input type="number" id="min-trades" value="30" min="1">
+      </label>
+    
+      <label>
+        Metric:
+        <select id="metric-select">
+          <option value="Expectancy (USD)">Expectancy</option>
+          <option value="Total PnL">Total PnL</option>
+        </select>
+      </label>
+    
+      <label>
+        Sort:
+        <select id="sort-select">
+          <option value="desc">Best → Worst</option>
+          <option value="asc">Worst → Best</option>
+        </select>
+      </label>
+    </div>
+  
+    <!-- Entry tag summary -->
+    <div id="entry-tag-summary" class="entry-summary"></div>
+  
+    <!-- Context grid -->
+    <div id="conditional-entry-grid" class="conditional-entry-grid"></div>
+  </section>
+  
+  <section class="card full-width">
+    <h2>Capital & Exposure Analysis</h2>
+  
+    <!-- ROW 1 -->
+    <div class="capital-row">
+      <div id="overtrading-table"></div>
+      <div id="capital-summary"></div>
+    </div>
+  
+    <!-- ROW 2 -->
+    <div class="capital-row">
+      <div id="overtrading-chart-pnl"></div>
+      <div id="overtrading-chart-dd"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- SECTION RENDERERS -->
+<script src="static/sections/backtest_config.js"></script>
+<script src="static/sections/kpi.js"></script>
+<script src="static/sections/trade_distribution.js"></script>
+<script src="static/sections/conditional_expectancy.js"></script>
+<script src="static/sections/equity_drawdown.js"></script>
+<script src="static/sections/entry_exit_diagnostics.js"></script>
+<script src="static/sections/drawdown_structure.js"></script>
+<script src="static/sections/conditional_entry_tag.js"></script>
+<script src="static/sections/capital_exposure.js"></script>
+
+
+<!-- BOOTSTRAP -->
+<script src="static/dashboard.js"></script>
+
+</body>
+</html>

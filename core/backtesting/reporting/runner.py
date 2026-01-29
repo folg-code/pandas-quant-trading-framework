@@ -1,6 +1,10 @@
+import subprocess
+from pathlib import Path
+
 from config.backtest import INITIAL_BALANCE
 from core.backtesting.reporting.core.context import ReportContext
 from core.backtesting.reporting.core.equity import EquityPreparer
+from core.backtesting.reporting.core.persistence import ReportPersistence
 from core.backtesting.reporting.core.sections.backtest_config import BacktestConfigSection
 from core.backtesting.reporting.core.sections.capital_exposure import CapitalExposureSection
 from core.backtesting.reporting.core.sections.conditional_entry_tag import ConditionalEntryTagPerformanceSection
@@ -11,6 +15,7 @@ from core.backtesting.reporting.core.sections.entry_tag_performance import Entry
 from core.backtesting.reporting.core.sections.exit_logic_diagnostics import ExitLogicDiagnosticsSection
 from core.backtesting.reporting.core.sections.tail_risk import TailRiskSection
 from core.backtesting.reporting.core.sections.trade_distribution import TradeDistributionSection
+from core.backtesting.reporting.renders.dashboard.dashboard_renderer import DashboardRenderer
 from core.backtesting.reporting.renders.stdout import StdoutRenderer
 from core.backtesting.reporting.reports.risk import RiskReport
 
@@ -75,9 +80,22 @@ class ReportRunner:
             ]
         )
 
-        # ==================================================
-        # COMPUTE & RENDER
-        # ==================================================
-
         data = report.compute(ctx)
+
         self.renderer.render(data)
+
+        # ==========================
+        # PERSIST FOR DASHBOARD
+        # ==========================
+
+        ReportPersistence().persist(
+            trades=ctx.trades,
+            equity=ctx.equity,
+            report_data=data,
+            meta={},
+        )
+
+        DashboardRenderer().render(data, ctx)
+
+
+        print("\n✅ Dashboard built successfully\n")

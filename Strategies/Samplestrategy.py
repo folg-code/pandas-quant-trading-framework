@@ -9,28 +9,20 @@ from TechnicalAnalysis.MarketStructure.engine import MarketStructureEngine
 
 
 class Samplestrategy(BaseStrategy):
-    """
-    Minimal, educational strategy showcasing:
-    - MarketStructureEngine
-    - structural bias
-    - BOS + follow-through continuation
-    """
 
-    class Samplestrategy(BaseStrategy):
-
-        def __init__(
-                self,
-                df,
-                symbol,
-                startup_candle_count,
-                provider,
-        ):
-            super().__init__(
-                df=df,
-                symbol=symbol,
-                startup_candle_count=startup_candle_count,
-                provider=provider,
-            )
+    def __init__(
+            self,
+            df,
+            symbol,
+            startup_candle_count,
+            provider,
+    ):
+        super().__init__(
+            df=df,
+            symbol=symbol,
+            startup_candle_count=startup_candle_count,
+            provider=provider,
+        )
 
     @informative("M30")
     def populate_indicators_M30(self, df):
