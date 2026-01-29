@@ -42,7 +42,7 @@ class EntryTagPerformanceSection(ReportSection):
                 "Trades": int(len(g)),
                 "Expectancy (USD)": float(expectancy),
                 "Avg duration": {"raw": avg_duration_s, "kind": "duration_s"},
-                "Win rate": float((pnl > 0).mean()),
+                "Win rate": {"raw": float((pnl > 0).mean()), "kind": "pct"},
                 "Average win": float(wins.mean()) if not wins.empty else 0.0,
                 "Average loss": float(losses.mean()) if not losses.empty else 0.0,
                 "Max consecutive wins": self._max_consecutive(pnl > 0),

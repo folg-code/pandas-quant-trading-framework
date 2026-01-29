@@ -46,7 +46,7 @@ class ExitLogicDiagnosticsSection(ReportSection):
                 "Trades": int(len(g)),
                 "Expectancy (USD)": float(pnl.mean()),
                 "Avg duration": {"raw": avg_duration_s, "kind": "duration_s"},
-                "Win rate": float((pnl > 0).mean()),
+                "Win rate": {"raw": float((pnl > 0).mean()), "kind": "pct"},
                 "Average PnL": float(pnl.mean()),
                 "Total PnL": float(pnl.sum()),
                 "Contribution to total PnL (%)": {

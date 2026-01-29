@@ -81,11 +81,10 @@ def format_value(raw: Any, kind: str = "auto") -> str:
 
         # ---- percentages (raw = 0..1) ----
         if kind == "pct":
-            return f"{sig5(x * 100)}%"
+            return f"{x * 100:,.2f}%"
 
-        # ---- money / numeric metrics ----
         if kind == "money":
-            return sig5(x)
+            return f"{x:,.2f}"
 
         if kind in {"auto", "num"}:
             return sig5(x)
