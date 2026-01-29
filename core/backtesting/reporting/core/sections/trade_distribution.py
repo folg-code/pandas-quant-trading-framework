@@ -16,7 +16,10 @@ class TradeDistributionSection(ReportSection):
     def compute(self, ctx: ReportContext) -> dict:
 
         trades = ctx.trades.copy()
-        r = trades["returns"]  # R-multiple
+
+        r = trades["returns"]          # R-multiple
+        d_hours = trades["duration"] / 3600.0       # trade duration (candles / minutes)
+
 
         total = len(r)
 
@@ -32,23 +35,26 @@ class TradeDistributionSection(ReportSection):
         }
 
         distribution_rows = []
+
         for label, mask in buckets.items():
-            count = mask.sum()
+            count = int(mask.sum())
+
             distribution_rows.append({
                 "Bucket": label,
-                "Trades": int(count),
+                "Trades": count,
                 "Share (%)": count / total if total else 0.0,
+                "Avg duration": float(d_hours[mask].mean()) if count else 0.0,
             })
 
         # ------------------------------
-        # Summary stats
+        # Summary stats (unchanged)
         # ------------------------------
         summary_rows = [
             {"Metric": "Trades count", "Value": total},
-            {"Metric": "Mean R", "Value": r.mean()},
-            {"Metric": "Median R", "Value": r.median()},
-            {"Metric": "Positive R (%)", "Value": (r > 0).mean()},
-            {"Metric": "Negative R (%)", "Value": (r < 0).mean()},
+            {"Metric": "Mean R", "Value": float(r.mean())},
+            {"Metric": "Median R", "Value": float(r.median())},
+            {"Metric": "Positive R (%)", "Value": float((r > 0).mean())},
+            {"Metric": "Negative R (%)", "Value": float((r < 0).mean())},
         ]
 
         return {

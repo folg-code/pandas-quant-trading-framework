@@ -105,6 +105,7 @@ body {
   text-align: center;
 }
 
+
 .kpi-grid.compact h3 {
   font-size: 13px;
   color: $muted;
@@ -116,6 +117,28 @@ body {
   font-weight: 600;
 }
 
+// ==========================
+// Trade Distribution
+// ==========================
+
+.trade-dist-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); // 3 × 1/3
+  gap: 16px;
+}
+
+.trade-dist-row > div {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 260px;
+}
+
+.trade-dist-row h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
 .card {
   background: $card;
   border-radius: 8px;
@@ -124,6 +147,11 @@ body {
 
 .full-width {
   grid-column: 1 / -1;
+}
+
+#equity-drawdown-chart {
+  width: 100%;
+  min-height: 420px;
 }
 
 .main-grid {
