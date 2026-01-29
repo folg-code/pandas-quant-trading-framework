@@ -25,18 +25,33 @@ function renderConditionalEntryTag(report) {
   // ==================================================
 
   function renderSummaryTable(row) {
-    const table = document.createElement("table");
     const cols = Object.keys(row);
 
+    const wrapper = document.createElement("div");
+    wrapper.className = "diag-section";
+
+    const body = document.createElement("div");
+    body.className = "diag-body";
+    body.style.display = "block";
+
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "diag-table";
+
+    const table = document.createElement("table");
     table.innerHTML = `
       <thead>
         <tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>
       </thead>
       <tbody>
-        <tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>
+        <tr>${cols.map(c => `<td>${window.displayValue(row[c])}</td>`).join("")}</tr>
       </tbody>
     `;
-    return table;
+
+    tableWrap.appendChild(table);
+    body.appendChild(tableWrap);
+    wrapper.appendChild(body);
+
+    return wrapper;
   }
 
   function renderBarChart(container, title, categories, values, metric) {
@@ -52,7 +67,8 @@ function renderConditionalEntryTag(report) {
 
     if (!categories.length) return;
 
-    const maxAbs = Math.max(...values.map(v => Math.abs(v))) || 1;
+    const safe = values.map(v => Number(v) || 0);
+    const maxAbs = Math.max(1e-9, ...safe.map(v => Math.abs(v)));
 
     Plotly.newPlot(
       chartDiv,
@@ -68,6 +84,7 @@ function renderConditionalEntryTag(report) {
         },
       }],
       {
+        height: 260,
         margin: { t: 20, l: 40, r: 20, b: 40 },
         paper_bgcolor: "#161b22",
         plot_bgcolor: "#161b22",
@@ -126,18 +143,18 @@ function renderConditionalEntryTag(report) {
 
     Object.entries(section).forEach(([ctxName, block]) => {
       let rows = block.rows.filter(
-        r => r["Entry tag"] === entryTag && r["Trades"] >= minTrades
+        r => r["Entry tag"] === entryTag && (Number(window.rawValue(r["Trades"])) || 0) >= minTrades
       );
       if (!rows.length) return;
 
       rows.sort((a, b) => {
-        const va = a[metric];
-        const vb = b[metric];
-        return sortDir === "desc" ? vb - va : va - vb;
+        const va = Number(window.rawValue(a[metric])) || 0;
+        const vb = Number(window.rawValue(b[metric])) || 0;
+        return sortDir === "desc" ? (vb - va) : (va - vb);
       });
 
-      const categories = rows.map(r => r["Context"]);
-      const values = rows.map(r => r[metric]);
+      const categories = rows.map(r => window.displayValue(r["Context"]));
+      const values = rows.map(r => Number(window.rawValue(r[metric])) || 0);
 
       if (ctxName.toLowerCase().includes("hour") ||
           ctxName.toLowerCase().includes("weekday")) {

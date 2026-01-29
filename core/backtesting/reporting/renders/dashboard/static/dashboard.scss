@@ -322,3 +322,8 @@ h1, h2 {
   max-width: 100% !important;
   min-height: 260px;
 }
+
+.context-chart > div,
+.time-chart > div {
+  min-height: 260px;
+}

@@ -284,4 +284,9 @@ h1, h2 {
   min-height: 260px;
 }
 
+.context-chart > div,
+.time-chart > div {
+  min-height: 260px;
+}
+
 /*# sourceMappingURL=dashboard.css.map */
