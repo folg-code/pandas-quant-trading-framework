@@ -10,7 +10,7 @@ from core.backtesting.reporting.core.sections.backtest_config import BacktestCon
 from core.backtesting.reporting.core.sections.capital_exposure import CapitalExposureSection
 from core.backtesting.reporting.core.sections.conditional_entry_tag import ConditionalEntryTagPerformanceSection
 from core.backtesting.reporting.core.sections.conditional_expectancy import ConditionalExpectancySection
-from core.backtesting.reporting.core.sections.core_performance import CorePerformanceSection
+from core.backtesting.reporting.core.sections.kpi import CorePerformanceSection
 from core.backtesting.reporting.core.sections.drawdown_structure import DrawdownStructureSection
 from core.backtesting.reporting.core.sections.entry_tag_performance import EntryTagPerformanceSection
 from core.backtesting.reporting.core.sections.exit_logic_diagnostics import ExitLogicDiagnosticsSection

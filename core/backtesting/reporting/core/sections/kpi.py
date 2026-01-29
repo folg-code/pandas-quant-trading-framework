@@ -45,18 +45,18 @@ class CorePerformanceSection(ReportSection):
             if not losses.empty else None
         )
 
-        max_dd_abs = trades["drawdown"].min()
-        max_dd_pct = max_dd_abs / initial_balance if initial_balance else None
-
         expectancy = pnl.mean()
 
+        max_dd_abs = float(trades["drawdown"].max()) if "drawdown" in trades.columns else None
+        max_dd_pct = (max_dd_abs / initial_balance) if (max_dd_abs is not None and initial_balance) else None
+
         return {
-            "Total return (%)": total_return,
-            "CAGR (%)": cagr,
-            "Profit factor": profit_factor,
-            "Expectancy (USD)": expectancy,
-            "Max drawdown ($)": abs(max_dd_abs),
-            "Max drawdown (%)": abs(max_dd_pct),
+            "Total return (%)": {"raw": float(total_return), "kind": "pct"},
+            "CAGR (%)": {"raw": float(cagr) if cagr is not None else None, "kind": "pct"},
+            "Profit factor": {"raw": float(profit_factor) if profit_factor is not None else None, "kind": "num"},
+            "Expectancy (USD)": {"raw": float(expectancy), "kind": "money"},
+            "Max drawdown ($)": {"raw": float(max_dd_abs) if max_dd_abs is not None else None, "kind": "money"},
+            "Max drawdown (%)": {"raw": float(max_dd_pct) if max_dd_pct is not None else None, "kind": "pct"},
         }
 
     # ==================================================
