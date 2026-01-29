@@ -96,29 +96,24 @@ def coerce_value(obj: Any, *, default_kind: str = "auto") -> Value:
 
 
 def materialize(obj: Any) -> Any:
-    """
-    Walks report payload recursively.
-    Converts:
-      - Value / value-dict -> value-dict with guaranteed "display"
-      - lists/dicts: deep materialize
-      - primitives: left as-is (but you usually want wrapping in sections)
-    """
-    # Value / value-dict
+    # already-wrapped values
     if isinstance(obj, Value) or _is_value_dict(obj):
         v = coerce_value(obj)
         display = v.display if v.display is not None else format_value(v.raw, v.kind)
         return {"raw": v.raw, "kind": v.kind, "display": display}
 
-    # dict
+    # ✅ auto-wrap numeric primitives so rounding applies everywhere
+    if isinstance(obj, (int, float)):
+        kind = "int" if isinstance(obj, int) else "auto"
+        return {"raw": obj, "kind": kind, "display": format_value(obj, kind)}
+
     if isinstance(obj, dict):
         return {k: materialize(v) for k, v in obj.items()}
 
-    # list/tuple
     if isinstance(obj, list):
         return [materialize(x) for x in obj]
 
     if isinstance(obj, tuple):
         return tuple(materialize(x) for x in obj)
 
-    # primitive
     return obj

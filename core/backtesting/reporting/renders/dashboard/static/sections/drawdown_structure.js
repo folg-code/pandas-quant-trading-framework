@@ -34,7 +34,7 @@ function renderDrawdownStructure(report) {
       <tbody>
         ${rows.map(r => `
           <tr>
-            ${cols.map(c => `<td>${r[c]}</td>`).join("")}
+            ${cols.map(c => `<td>${window.displayValue(r[c])}</td>`).join("")}
           </tr>
         `).join("")}
       </tbody>

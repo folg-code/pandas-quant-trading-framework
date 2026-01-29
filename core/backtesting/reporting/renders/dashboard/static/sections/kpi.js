@@ -1,25 +1,35 @@
 function renderKPI(report) {
-  const core = report["Core Performance Metrics"] || {};
-  const kpiGrid = document.getElementById("kpi-grid");
-  if (!kpiGrid) return;
+  const root = document.getElementById("kpi-grid");
+  if (!root) return;
 
+  // section name from python
+  const payload = report["Core Performance Metrics"];
+  if (!payload) return;
+
+  // pick KPIs (keys must match what your section emits)
   const kpis = [
-    ["Total return (%)", "%"],
-    ["CAGR (%)", "%"],
-    ["Expectancy (USD)", ""],
-    ["Max drawdown (%)", "%"],
+    { label: "Total return (%)", key: "Total return (%)" },
+    { label: "CAGR (%)", key: "CAGR (%)" },
+    { label: "Expectancy (USD)", key: "Expectancy (USD)" },
+    { label: "Max drawdown (%)", key: "Max drawdown (%)" },
   ];
 
-  kpis.forEach(([key, suffix]) => {
-    const v = core[key] ?? "-";
+  root.innerHTML = "";
 
+  kpis.forEach(({ label, key }) => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `
-      <h3>${key}</h3>
-      <div class="kpi-value">${v}${suffix}</div>
-    `;
 
-    kpiGrid.appendChild(card);
+    const h3 = document.createElement("h3");
+    h3.textContent = label;
+
+    const v = document.createElement("div");
+    v.className = "kpi-value";
+
+    v.textContent = window.displayValue(payload[key]);
+
+    card.appendChild(h3);
+    card.appendChild(v);
+    root.appendChild(card);
   });
 }
