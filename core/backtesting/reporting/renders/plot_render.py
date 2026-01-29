@@ -49,6 +49,10 @@ class PlotRenderer:
     # ------------------------------
 
     def _fmt(self, v, pct: bool = False):
+        if isinstance(v, dict) and "display" in v:
+            return v["display"]
+
+        # legacy fallback
         if v is None:
             return "-"
 
