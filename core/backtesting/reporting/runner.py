@@ -61,6 +61,8 @@ class ReportRunner:
             strategy=self.strategy,
         )
 
+        print(ctx.trades.columns)
+
         # ==================================================
         # BUILD REPORT (SECTIONS)
         # ==================================================

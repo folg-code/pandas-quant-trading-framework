@@ -9,7 +9,6 @@ class TradeContextEnricher:
     def __init__(self, df_candles: pd.DataFrame):
         df = df_candles.copy()
 
-        # 🔑 NORMALIZE TIME (ABSOLUTNIE KLUCZOWE)
         df["time"] = pd.to_datetime(df["time"], utc=True)
 
         self.df = df.sort_values("time")

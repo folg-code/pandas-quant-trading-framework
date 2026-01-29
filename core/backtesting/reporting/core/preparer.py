@@ -15,7 +15,6 @@ class RiskDataPreparer:
 
         df = trades.sort_values("exit_time").copy()
 
-        # --- equity curve ---
         df["equity"] = self.initial_balance + df["pnl_usd"].cumsum()
 
         # --- drawdown ---

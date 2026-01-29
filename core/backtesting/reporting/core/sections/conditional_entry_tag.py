@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Dict, Any
 
+import pandas as pd
+
 from core.backtesting.reporting.core.section import ReportSection
 from core.backtesting.reporting.core.context import ReportContext
 
@@ -11,6 +13,8 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
     """
 
     name = "Conditional Entry Tag Performance"
+    MAX_NUMERIC_UNIQUES = 25
+    MAX_CATEGORY_UNIQUES = 64  # warning threshold (optional)
 
     def compute(self, ctx: ReportContext) -> Dict[str, Any]:
         trades = ctx.trades.copy()
@@ -21,23 +25,30 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
         if "entry_tag" not in trades.columns:
             return {"error": "entry_tag missing"}
 
-        # Ensure datetime
         trades["entry_time"] = trades["entry_time"].astype("datetime64[ns, UTC]")
         trades["hour"] = trades["entry_time"].dt.hour
         trades["weekday"] = trades["entry_time"].dt.day_name()
 
-        results = {}
+        results: Dict[str, Any] = {}
+        issues = []
 
         # -----------------------------------
-        # 1. By market regime (all contexts)
+        # 1) By market regime (auto contexts)
         # -----------------------------------
-        for col in self._detect_context_columns(trades):
+        context_cols, detect_issues = self._detect_context_columns(trades)
+        issues.extend(detect_issues)
+
+        for col in context_cols:
             results[f"By {col}"] = self._by_context(trades, col)
 
         # -----------------------------------
-        # 2. By hour of day
+        # 2) By hour of day
         # -----------------------------------
         results["By hour"] = self._by_context(trades, "hour")
+
+        # Attach issues (so dashboard/stdout can show them)
+        if issues:
+            results["__context_issues__"] = {"rows": issues}
 
         return results
 
@@ -45,12 +56,28 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
     # Core logic
     # ==================================================
 
+    @staticmethod
+    def _norm_ctx(v):
+        # normalize context values for grouping/labels
+        if v is None or (isinstance(v, float) and pd.isna(v)) or pd.isna(v):
+            return None
+        if isinstance(v, (bool, np.bool_)):
+            return "true" if bool(v) else "false"
+        return str(v)
+
     def _by_context(self, trades, context_col):
         rows = []
 
-        grouped = trades.groupby(["entry_tag", context_col])
+        # normalize the context into a safe categorical key
+        tmp = trades.copy()
+        tmp["_ctx"] = tmp[context_col].map(self._norm_ctx)
+
+        grouped = tmp.groupby(["entry_tag", "_ctx"], dropna=True)
 
         for (tag, ctx_val), g in grouped:
+            if ctx_val is None:
+                continue
+
             pnl = g["pnl_usd"]
 
             rows.append({
@@ -62,12 +89,7 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
                 "Total PnL": float(pnl.sum()),
             })
 
-        # Sort by expectancy
-        rows = sorted(
-            rows,
-            key=lambda x: x["Expectancy (USD)"],
-            reverse=True
-        )
+        rows = sorted(rows, key=lambda x: x["Expectancy (USD)"], reverse=True)
 
         return {
             "rows": rows,
@@ -87,7 +109,49 @@ class ConditionalEntryTagPerformanceSection(ReportSection):
             "hour", "weekday"
         }
 
-        return [
-            c for c in trades.columns
-            if c not in excluded and trades[c].dtype == object
-        ]
+        issues = []
+        cols = []
+
+        for c in trades.columns:
+            if c in excluded:
+                continue
+
+            s = trades[c]
+            s_nonnull = s.dropna()
+
+            if s_nonnull.empty:
+                continue
+
+            # allow booleans
+            if pd.api.types.is_bool_dtype(s.dtype) or s_nonnull.map(lambda v: isinstance(v, (bool, np.bool_))).all():
+                cols.append(c)
+                continue
+
+            # numeric: reject if too many unique
+            if pd.api.types.is_numeric_dtype(s.dtype):
+                uniq = int(pd.Series(s_nonnull.unique()).nunique())
+                if uniq > self.MAX_NUMERIC_UNIQUES:
+                    issues.append({
+                        "level": "error",
+                        "context": c,
+                        "message": f"Numeric context has too many unique values ({uniq} > {self.MAX_NUMERIC_UNIQUES}). Skipped.",
+                        "unique_count": uniq,
+                    })
+                    continue
+                cols.append(c)
+                continue
+
+            # object/category: accept
+            if s.dtype == object or pd.api.types.is_categorical_dtype(s.dtype):
+                uniq = int(s_nonnull.astype(str).nunique())
+                if uniq > self.MAX_CATEGORY_UNIQUES:
+                    issues.append({
+                        "level": "warning",
+                        "context": c,
+                        "message": f"Context has high cardinality ({uniq}). Consider bucketing.",
+                        "unique_count": uniq,
+                    })
+                cols.append(c)
+                continue
+
+        return cols, issues

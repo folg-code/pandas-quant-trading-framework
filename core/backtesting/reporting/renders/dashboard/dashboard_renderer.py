@@ -25,6 +25,7 @@ class DashboardRenderer:
     def render(self, report_data: dict, ctx) -> Path:
         template = self.env.get_template("dashboard.html")
 
+
         html = template.render(
             report=report_data,
             report_json=json.dumps(

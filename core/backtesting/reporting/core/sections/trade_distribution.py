@@ -17,8 +17,8 @@ class TradeDistributionSection(ReportSection):
 
         trades = ctx.trades.copy()
 
-        r = trades["returns"]          # R-multiple
-        d_hours = trades["duration"] / 3600.0       # trade duration (candles / minutes)
+        r = trades["returns"]
+        d_hours = trades["duration"] / 3600.0
 
 
         total = len(r)
