@@ -1,10 +1,13 @@
+function rawValue(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "object" && v.raw !== undefined) return v.raw;
+  return v;
+}
+window.rawValue = rawValue;
+
 function renderConditionalExpectancy(report) {
   const section = report["Conditional Expectancy Analysis"];
   if (!section) return;
-
-  // ==========================
-  // Helper
-  // ==========================
 
   function renderBar(containerId, title, categories, values, height = 220) {
     const container = document.getElementById(containerId);
@@ -16,7 +19,9 @@ function renderConditionalExpectancy(report) {
     `;
 
     const chartDiv = container.querySelector("div");
-    const maxAbs = Math.max(...values.map(v => Math.abs(v)));
+
+    const safe = values.map(v => Number(v) || 0);
+    const maxAbs = Math.max(1e-9, ...safe.map(v => Math.abs(v)));
 
     Plotly.newPlot(
       chartDiv,
@@ -24,9 +29,9 @@ function renderConditionalExpectancy(report) {
         {
           type: "bar",
           x: categories,
-          y: values,
+          y: safe,
           marker: {
-            color: values,
+            color: safe,
             colorscale: "RdBu",
             cmin: -maxAbs,
             cmax: maxAbs,
@@ -45,26 +50,20 @@ function renderConditionalExpectancy(report) {
     );
   }
 
-  // ==========================
-  // By hour of day (2/3)
-  // ==========================
-
+  // By hour of day
   if (section["By hour of day"]?.rows) {
     const HOURS = Array.from({ length: 24 }, (_, i) => String(i));
     const map = {};
 
     section["By hour of day"].rows.forEach(r => {
-      map[r["hour"]] = r["Expectancy (USD)"];
+      map[r["hour"]] = window.rawValue(r["Expectancy (USD)"]);
     });
 
     const values = HOURS.map(h => map[h] ?? 0);
     renderBar("cond-hour", "By hour of day", HOURS, values, 260);
   }
 
-  // ==========================
-  // By day of week (1/3)
-  // ==========================
-
+  // By day of week
   if (section["By day of week"]?.rows) {
     const ORDER = [
       "Monday", "Tuesday", "Wednesday",
@@ -73,17 +72,14 @@ function renderConditionalExpectancy(report) {
 
     const map = {};
     section["By day of week"].rows.forEach(r => {
-      map[r["weekday"]] = r["Expectancy (USD)"];
+      map[r["weekday"]] = window.rawValue(r["Expectancy (USD)"]);
     });
 
     const values = ORDER.map(d => map[d] ?? 0);
     renderBar("cond-weekday", "By day of week", ORDER, values, 260);
   }
 
-  // ==========================
-  // By context (2 per row)
-  // ==========================
-
+  // By context
   const contextRoot = document.getElementById("cond-context-grid");
   if (!contextRoot) return;
 
@@ -99,7 +95,7 @@ function renderConditionalExpectancy(report) {
       return r[k];
     });
 
-    const values = block.rows.map(r => r["Expectancy (USD)"]);
+    const values = block.rows.map(r => window.rawValue(r["Expectancy (USD)"]) ?? 0);
 
     const id = "ctx-" + Math.random().toString(36).slice(2);
     container.id = id;
