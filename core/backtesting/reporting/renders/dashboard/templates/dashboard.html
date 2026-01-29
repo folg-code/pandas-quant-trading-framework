@@ -44,7 +44,15 @@
   <!-- CONDITIONAL -->
   <section class="card full-width">
     <h2>Conditional Expectancy</h2>
-    <div id="conditional-heatmap"></div>
+  
+    <!-- Row: hour + weekday -->
+    <div class="conditional-row">
+      <div id="cond-hour" class="cond-span-2"></div>
+      <div id="cond-weekday" class="cond-span-1"></div>
+    </div>
+  
+    <!-- Context rows -->
+    <div id="cond-context-grid" class="conditional-context-grid"></div>
   </section>
 
   <!-- DIAGNOSTICS -->
@@ -58,6 +66,7 @@
 <!-- SECTION RENDERERS -->
 <script src="static/sections/kpi.js"></script>
 <script src="static/sections/trade_distribution.js"></script>
+<script src="static/sections/conditional_expectancy.js"></script>
 
 <!-- BOOTSTRAP -->
 <script src="static/dashboard.js"></script>

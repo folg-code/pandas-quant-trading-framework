@@ -43,4 +43,24 @@ h1, h2 {
   margin: 0 0 12px 0;
 }
 
+.conditional-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.conditional-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.conditional-row > div,
+.conditional-context-grid > div {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 8px;
+}
+
 /*# sourceMappingURL=dashboard.css.map */
