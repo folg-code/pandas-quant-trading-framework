@@ -7,3 +7,4 @@ renderTradeDistribution(report);
 renderConditionalExpectancy(report);
 renderEquityDrawdown(report);
 renderDiagnostics(report);
+renderDrawdownStructure(report);
