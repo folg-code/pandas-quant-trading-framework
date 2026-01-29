@@ -4,6 +4,7 @@ from pathlib import Path
 from config.backtest import INITIAL_BALANCE
 from core.backtesting.reporting.core.context import ReportContext
 from core.backtesting.reporting.core.equity import EquityPreparer
+from core.backtesting.reporting.core.formating import materialize
 from core.backtesting.reporting.core.persistence import ReportPersistence
 from core.backtesting.reporting.core.sections.backtest_config import BacktestConfigSection
 from core.backtesting.reporting.core.sections.capital_exposure import CapitalExposureSection
@@ -81,6 +82,7 @@ class ReportRunner:
         )
 
         data = report.compute(ctx)
+        data = materialize(data)
 
         self.renderer.render(data)
 
