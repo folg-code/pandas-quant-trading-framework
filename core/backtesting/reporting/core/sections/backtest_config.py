@@ -17,7 +17,7 @@ class BacktestConfigSection(ReportSection):
         return {
             "Market & Data": {
                 "Instruments": cfg.SYMBOLS,
-                "Timeframe": cfg.TIMEFRAME,
+                "Execution timeframe": cfg.TIMEFRAME,
                 "Data source": cfg.BACKTEST_DATA_BACKEND,
                 "Backtest start": str(cfg.TIMERANGE["start"]),
                 "Backtest end": str(cfg.TIMERANGE["end"]),
@@ -32,6 +32,7 @@ class BacktestConfigSection(ReportSection):
             "Capital Model": {
                 "Starting equity": cfg.INITIAL_BALANCE,
                 "Position sizing": "Fixed size (implicit)",
+                "Max risk per trade": f"{cfg.MAX_RISK_PER_TRADE * 100} %",
                 "Leverage": "1x",
                 "Max concurrent positions": "Unlimited",
                 "Capital floor / kill-switch": "None (diagnostic mode)",

@@ -11,7 +11,7 @@ MARKET_DATA_PATH = "market_data"
 BACKTEST_DATA_BACKEND = "dukascopy"   # "dukascopy" | "csv"
 
 TIMERANGE = {
-    "start": "2025-01-01",
+    "start": "2025-12-01",
     "end":   "2025-12-31",
 }
 
@@ -27,7 +27,7 @@ BACKTEST_WINDOWS = {
 # STRATEGY
 # ==================================================
 
-STRATEGY_CLASS = "Samplestrategyreport"
+STRATEGY_CLASS = "Samplestrategy"
 STARTUP_CANDLE_COUNT = 600
 
 SYMBOLS = [

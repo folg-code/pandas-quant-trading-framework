@@ -1,0 +1,10 @@
+####### PRICE ACTION #########
+
+last_struct_event_type = MSS / BOS / NONE
+last_struct_event_side = BULL / BEAR
+
+jeśli LH (albo LH_idx) się nie zmieniło od ostatniego MSS bull, to ignoruj kolejne crossy.
+
+
+###### FIBO ################
+fix idx cond in 57 line

@@ -31,7 +31,7 @@ class DashboardRenderer:
                 {
                     **report_data,
                     "__equity__": {
-                        "time": ctx.trades["entry_time"].astype(str).tolist(),
+                        "time": ctx.trades["exit_time"].astype(str).tolist(),
                         "equity": ctx.trades["equity"].tolist(),
                         "drawdown": ctx.trades["drawdown"].tolist(),
                     }

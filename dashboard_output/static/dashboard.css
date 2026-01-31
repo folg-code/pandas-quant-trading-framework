@@ -1,13 +1,7 @@
-$bg: #0d1117;
-$card: #161b22;
-$text: #e6edf3;
-$muted: #8b949e;
-$accent: #58a6ff;
-
 body {
   margin: 0;
-  background: $bg;
-  color: $text;
+  background: #0d1117;
+  color: #e6edf3;
   font-family: Inter, system-ui, sans-serif;
 }
 
@@ -20,10 +14,6 @@ body {
 .header {
   margin-bottom: 24px;
 }
-
-// ==========================
-// Backtest Configuration
-// ==========================
 
 .config-grid {
   display: grid;
@@ -69,47 +59,48 @@ body {
   max-width: 60%;
 }
 
-// ==========================
-// Top layout (Backtest + KPI)
-// ==========================
-
 .top-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 16px;
   margin-bottom: 24px;
   align-items: stretch;
-
-.kpi-table, .info-table {
-  width: 100%;
-  overflow-x: auto;
 }
 
-.kpi-table table, .info-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+/* KPI panel fills height */
+.kpi-panel {
+  display: flex;
+  flex-direction: column;
 }
 
-.kpi-table th, .kpi-table td,
-.info-table th, .info-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid #30363d;
+/* Compact KPI grid */
+.kpi-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 12px;
+  flex: 1;
 }
 
-.kpi-table th, .info-table th {
-  text-align: left;
+/* KPI cards inside */
+.kpi-grid.compact .card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.kpi-grid.compact h3 {
+  font-size: 13px;
   color: #8b949e;
+  margin-bottom: 6px;
+}
+
+.kpi-grid.compact .kpi-value {
+  font-size: 24px;
   font-weight: 600;
 }
-
-.kpi-table td, .info-table td {
-  text-align: right;
-}
-
-// ==========================
-// Trade Distribution
-// ==========================
 
 .trade-dist-row {
   display: grid;
@@ -130,13 +121,13 @@ body {
 }
 
 .card {
-  background: $card;
+  background: #161b22;
   border-radius: 8px;
   padding: 16px;
 }
 
 .full-width {
-  grid-column: 1 / -1;
+  grid-column: 1/-1;
 }
 
 #equity-drawdown-chart {
@@ -154,10 +145,6 @@ body {
 h1, h2 {
   margin: 0 0 12px 0;
 }
-
-// ==========================
-// Conditional Expectancy
-// ==========================
 
 .conditional-row {
   display: grid;
@@ -179,10 +166,6 @@ h1, h2 {
   padding: 8px;
 }
 
-// ==========================
-// Diagnostics tables
-// ==========================
-
 .diag-section {
   margin-bottom: 16px;
 }
@@ -199,7 +182,7 @@ h1, h2 {
 }
 
 .diag-header span {
-  color: $muted;
+  color: #8b949e;
   font-size: 12px;
 }
 
@@ -226,18 +209,14 @@ h1, h2 {
   text-align: left;
 }
 
-// ==========================
-// Diagnostics layout
-// ==========================
-
 .diag-body {
-  display: block;        // domyślnie OTWARTE
+  display: block;
   margin-top: 8px;
 }
 
 .diag-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;  // 👈 2/3 + 1/3
+  grid-template-columns: 2fr 1fr;
   gap: 16px;
   align-items: start;
 }
@@ -251,10 +230,6 @@ h1, h2 {
   border-radius: 6px;
   padding: 8px;
 }
-
-// ==========================
-// Conditional Entry Tag
-// ==========================
 
 .entry-selector {
   margin-bottom: 12px;
@@ -275,13 +250,13 @@ h1, h2 {
 
 .context-chart,
 .time-chart {
-  grid-column: span 3;   // context
+  grid-column: span 3;
   max-width: 100%;
   overflow: hidden;
 }
 
 .time-chart {
-  grid-column: span 6;   // time
+  grid-column: span 6;
 }
 
 .context-chart > div,
@@ -290,13 +265,9 @@ h1, h2 {
   max-width: 100% !important;
 }
 
-// ==========================
-// Capital & Exposure
-// ==========================
-
 .capital-row {
   display: grid;
-  grid-template-columns: 1fr 1fr; // 1/2 + 1/2
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -349,3 +320,5 @@ h1, h2 {
 .tile > div {
   min-height: 260px;
 }
+
+/*# sourceMappingURL=dashboard.css.map */
